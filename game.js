@@ -18,48 +18,68 @@ const Game = {
   CHUNK_WIDTH: 32,
   CHUNK_HEIGHT: 32,
   // in game.js
-  _spawnEnemy: function () {
-    // Find a random, empty, on-screen starting position
+// in game.js
+// in game.js
+_spawnEnemy: function() {
     let x, y;
     do {
-      x =
-        this.player.x + Math.floor((Math.random() - 0.5) * this.DISPLAY_WIDTH);
-      y =
-        this.player.y + Math.floor((Math.random() - 0.5) * this.DISPLAY_HEIGHT);
-    } while (this._getTileAt(x, y) !== ".");
+        x = this.player.x + Math.floor((Math.random() - 0.5) * this.DISPLAY_WIDTH);
+        y = this.player.y + Math.floor((Math.random() - 0.5) * this.DISPLAY_HEIGHT);
+    } while (this._getTileAt(x, y) !== '.');
 
     const enemy = {
-      x: x,
-      y: y,
-      hp: 1.0,
-      char: "Č",
-      color: "#654321", // Dark Brown
-      game: this, // Give enemy a reference to the main game object
+        x: x, y: y,
+        char: 'Č', color: '#654321',
+        hp: 1.0, game: this,
+        isAiming: false, // Add aiming flag
 
-      act: function () {
-        const player = this.game.player;
+        act: function() {
+            if (this.game.player.hp <= 0) { return; }
 
-        // A* pathfinding
-        const passableCallback = (x, y) => this.game._getTileAt(x, y) === ".";
-        const astar = new ROT.Path.AStar(player.x, player.y, passableCallback, {
-          topology: 8,
-        });
+            const p = this.game.player;
+            const distance = Math.hypot(p.x - this.x, p.y - this.y);
+            const SHOOT_RANGE = 12;
 
-        const path = [];
-        astar.compute(this.x, this.y, (x, y) => {
-          path.push({ x, y });
-        });
+            // Check for Line of Sight
+            let has_los = false;
+            if (distance <= SHOOT_RANGE) {
+                const line = this.game._getLine(this.x, this.y, p.x, p.y);
+                let is_clear = true;
+                for (let i = 1; i < line.length - 1; i++) {
+                    if (this.game._getTileAt(line[i].x, line[i].y) !== '.') {
+                        is_clear = false;
+                        break;
+                    }
+                }
+                if (is_clear) { has_los = true; }
+            }
 
-        if (path.length > 1) {
-          // Move to the first step on the path towards the player
-          this.x = path[1].x;
-          this.y = path[1].y;
+            // AI Decision: Aim, Shoot, or Move
+            if (this.isAiming) {
+                // Was aiming last turn. Now, shoot!
+                this.isAiming = false; // Reset state
+                if (has_los) { // Re-check LOS in case player moved
+                    this.game._playerHit(this);
+                }
+            } else if (has_los) {
+                // Has a clear shot, so take a turn to aim.
+                this.isAiming = true;
+            } else {
+                // No shot, so move.
+                const passableCallback = (x, y) => (this.game._getTileAt(x, y) === '.');
+                const astar = new ROT.Path.AStar(p.x, p.y, passableCallback, { topology: 8 });
+                const path = [];
+                astar.compute(this.x, this.y, (x, y) => { path.push({x, y}); });
+                if (path.length > 1) {
+                    this.x = path[1].x;
+                    this.y = path[1].y;
+                }
+            }
         }
-      },
     };
     this.enemies.push(enemy);
     this.scheduler.add(enemy, true);
-  },
+},
 // in game.js
 init: function() {
     this.display = new ROT.Display({ 
@@ -81,9 +101,10 @@ init: function() {
     this.cellWidth = this.particleCanvas.width / this.DISPLAY_WIDTH;
     this.cellHeight = this.particleCanvas.height / this.DISPLAY_HEIGHT;
 
-    this.player = { 
+this.player = { 
         x: 0, y: 0, ammo: 6,
-        isAiming: false, aimAngle: 0
+        isAiming: false, aimAngle: 0,
+        hp: 10 // Add health to the player
     };
 
     // MOVED UP: Initialize the scheduler and engine first
@@ -134,10 +155,10 @@ init: function() {
 
     let change = 0;
     if (code === ROT.KEYS.VK_LEFT) {
-      change = -15;
+      change = -5;
     }
     if (code === ROT.KEYS.VK_RIGHT) {
-      change = 15;
+      change = 5;
     }
 
     if (change !== 0) {
@@ -308,11 +329,12 @@ _createSplatterEffect: function(worldX, worldY, shotVector, type, particleCount)
           : ".";
     });
   },
-  _updateUI: function () {
+_updateUI: function() {
     const ui = document.getElementById("game-ui");
     const aimingText = this.player.isAiming ? " [AIMING]" : "";
-    ui.textContent = `Ammo: ${this.player.ammo}/6${aimingText}`;
-  },
+    // Add HP to the UI display
+    ui.textContent = `HP: ${this.player.hp}/10 | Ammo: ${this.player.ammo}/6${aimingText}`;
+},
   _worldToScreen: function (worldX, worldY) {
     const topLeftX = this.player.x - Math.floor(this.DISPLAY_WIDTH / 2);
     const topLeftY = this.player.y - Math.floor(this.DISPLAY_HEIGHT / 2);
@@ -419,6 +441,45 @@ _createSplatterEffect: function(worldX, worldY, shotVector, type, particleCount)
     }
   },
   // in game.js
+_playerHit: function(enemy) {
+    this.player.hp--;
+    this._updateUI();
+
+    // Trigger the screen flash
+    const flash = document.getElementById("flash-overlay");
+    flash.style.display = "block";
+    setTimeout(() => { flash.style.display = "none"; }, 100);
+
+    // Draw a tracer line from the enemy
+    const startPos = this._worldToScreen(enemy.x, enemy.y);
+    if (startPos) {
+        const startPixelX = (startPos.x * this.cellWidth) + (this.cellWidth / 2);
+        const startPixelY = (startPos.y * this.cellHeight) + (this.cellHeight / 2);
+        const endPixelX = this.particleCanvas.width / 2;
+        const endPixelY = this.particleCanvas.height / 2;
+        
+        this.particles.push({
+            x: startPixelX, y: startPixelY,
+            vx: (endPixelX - startPixelX) / 5, // Travel in 5 frames
+            vy: (endPixelY - startPixelY) / 5,
+            lifespan: 5,
+            color: "rgba(255, 100, 100, 0.8)",
+            size: 2
+        });
+    }
+
+    if (this.player.hp <= 0) {
+        this._gameOver();
+    }
+},
+
+_gameOver: function() {
+    this.engine.lock(); // Stop the game
+    const ui = document.getElementById("game-ui");
+    ui.textContent = "YOU DIED";
+    ui.style.color = "red";
+},
+  // in game.js
   _createRicochetEffect: function (worldX, worldY, shotVector) {
     const screenPos = this._worldToScreen(worldX, worldY);
     if (!screenPos) {
@@ -450,103 +511,102 @@ _createSplatterEffect: function(worldX, worldY, shotVector, type, particleCount)
     }
   },
 
-  // in game.js
-  _animationLoop: function () {
-    this.particleCtx.clearRect(
-      0,
-      0,
-      this.particleCanvas.width,
-      this.particleCanvas.height,
-    );
+// in game.js
+_animationLoop: function() {
+    this.particleCtx.clearRect(0, 0, this.particleCanvas.width, this.particleCanvas.height);
 
-    // --- 1. DRAW AIM LINE (if aiming) ---
+    // --- 1a. DRAW PLAYER AIM LINE ---
     if (this.player.isAiming) {
-      // Find the line's end point, stopping at obstacles
-      const p = this.player;
-      const rad = p.aimAngle * (Math.PI / 180);
-      const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
-      const maxRange = 20;
-      const endX = Math.round(p.x + aimVector.x * maxRange);
-      const endY = Math.round(p.y + aimVector.y * maxRange);
-      const line = this._getLine(p.x, p.y, endX, endY);
-
-      let finalPoint = line[line.length - 1];
-      for (let i = 1; i < line.length; i++) {
-        const point = line[i];
-        if (this._getTileAt(point.x, point.y) !== ".") {
-          finalPoint = point;
-          break;
+        // ... (this part is unchanged)
+        const p = this.player;
+        const rad = p.aimAngle * (Math.PI / 180);
+        const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
+        const maxRange = 20;
+        const endX = Math.round(p.x + aimVector.x * maxRange);
+        const endY = Math.round(p.y + aimVector.y * maxRange);
+        const line = this._getLine(p.x, p.y, endX, endY);
+        let finalPoint = line[line.length - 1];
+        for (let i = 1; i < line.length; i++) {
+            const point = line[i];
+            if (this._getTileAt(point.x, point.y) !== '.') {
+                finalPoint = point;
+                break;
+            }
         }
-      }
-
-      // CORRECTED: Calculate the start pixel position from the center grid cell
-      const startGridX = Math.floor(this.DISPLAY_WIDTH / 2);
-      const startGridY = Math.floor(this.DISPLAY_HEIGHT / 2);
-      const startPixelX = startGridX * this.cellWidth + this.cellWidth / 2;
-      const startPixelY = startGridY * this.cellHeight + this.cellHeight / 2;
-
-      const endScreenGrid = this._worldToScreen(finalPoint.x, finalPoint.y);
-
-      if (endScreenGrid) {
-        const endPixelX = endScreenGrid.x * this.cellWidth + this.cellWidth / 2;
-        const endPixelY =
-          endScreenGrid.y * this.cellHeight + this.cellHeight / 2;
-
-        // Draw a dashed yellow line on the particle canvas
-        this.particleCtx.beginPath();
-        this.particleCtx.setLineDash([5, 5]);
-        this.particleCtx.moveTo(startPixelX, startPixelY);
-        this.particleCtx.lineTo(endPixelX, endPixelY);
-        this.particleCtx.strokeStyle = "rgba(255, 255, 0, 0.5)";
-        this.particleCtx.lineWidth = 2;
-        this.particleCtx.stroke();
-        this.particleCtx.setLineDash([]);
-      }
+        const startGridX = Math.floor(this.DISPLAY_WIDTH / 2);
+        const startGridY = Math.floor(this.DISPLAY_HEIGHT / 2);
+        const startPixelX = (startGridX * this.cellWidth) + (this.cellWidth / 2);
+        const startPixelY = (startGridY * this.cellHeight) + (this.cellHeight / 2);
+        const endScreenGrid = this._worldToScreen(finalPoint.x, finalPoint.y);
+        if (endScreenGrid) {
+            const endPixelX = (endScreenGrid.x * this.cellWidth) + (this.cellWidth / 2);
+            const endPixelY = (endScreenGrid.y * this.cellHeight) + (this.cellHeight / 2);
+            this.particleCtx.beginPath();
+            this.particleCtx.setLineDash([5, 5]);
+            this.particleCtx.moveTo(startPixelX, startPixelY);
+            this.particleCtx.lineTo(endPixelX, endPixelY);
+            this.particleCtx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+            this.particleCtx.lineWidth = 2;
+            this.particleCtx.stroke();
+            this.particleCtx.setLineDash([]);
+        }
     }
 
-    // --- 2. DRAW PERSISTENT SPLATTERS ---
-    // (This part is unchanged)
-    for (const chunkKey in this.effects) {
-      for (const tileKey in this.effects[chunkKey]) {
-        const droplets = this.effects[chunkKey][tileKey];
-        const [chunkX, chunkY] = chunkKey.split(",").map(Number);
-        const [localX, localY] = tileKey.split(",").map(Number);
-        const worldX = chunkX * this.CHUNK_WIDTH + localX;
-        const worldY = chunkY * this.CHUNK_HEIGHT + localY;
-        const screenPos = this._worldToScreen(worldX, worldY);
-        if (screenPos) {
-          const originX = screenPos.x * this.cellWidth + this.cellWidth / 2;
-          const originY = screenPos.y * this.cellHeight + this.cellHeight / 2;
-          for (const droplet of droplets) {
-            this.particleCtx.fillStyle = droplet.color;
-            this.particleCtx.fillRect(
-              originX + droplet.dx,
-              originY + droplet.dy,
-              droplet.size,
-              droplet.size,
-            );
-          }
+    // --- 1b. DRAW ENEMY AIM LINES ---
+    this.enemies.forEach(enemy => {
+        if (enemy.isAiming && enemy.hp > 0) {
+            const startPos = this._worldToScreen(enemy.x, enemy.y);
+            if (startPos) {
+                const startPixelX = (startPos.x * this.cellWidth) + (this.cellWidth / 2);
+                const startPixelY = (startPos.y * this.cellHeight) + (this.cellHeight / 2);
+                const endPixelX = (Math.floor(this.DISPLAY_WIDTH / 2) * this.cellWidth) + (this.cellWidth / 2);
+                const endPixelY = (Math.floor(this.DISPLAY_HEIGHT / 2) * this.cellHeight) + (this.cellHeight / 2);
+
+                this.particleCtx.beginPath();
+                this.particleCtx.moveTo(startPixelX, startPixelY);
+                this.particleCtx.lineTo(endPixelX, endPixelY);
+                this.particleCtx.strokeStyle = 'rgba(255, 0, 0, 0.3)'; // Faint red
+                this.particleCtx.lineWidth = 1;
+                this.particleCtx.stroke();
+            }
         }
-      }
+    });
+
+    // --- 2. DRAW PERSISTENT SPLATTERS ---
+    // ... (this part is unchanged)
+    for (const chunkKey in this.effects) {
+        for (const tileKey in this.effects[chunkKey]) {
+            const droplets = this.effects[chunkKey][tileKey];
+            const [chunkX, chunkY] = chunkKey.split(',').map(Number);
+            const [localX, localY] = tileKey.split(',').map(Number);
+            const worldX = chunkX * this.CHUNK_WIDTH + localX;
+            const worldY = chunkY * this.CHUNK_HEIGHT + localY;
+            const screenPos = this._worldToScreen(worldX, worldY);
+            if (screenPos) {
+                const originX = (screenPos.x * this.cellWidth) + (this.cellWidth / 2);
+                const originY = (screenPos.y * this.cellHeight) + (this.cellHeight / 2);
+                for (const droplet of droplets) {
+                    this.particleCtx.fillStyle = droplet.color;
+                    this.particleCtx.fillRect(originX + droplet.dx, originY + droplet.dy, droplet.size, droplet.size);
+                }
+            }
+        }
     }
 
     // --- 3. ANIMATE TEMPORARY PARTICLES ---
-    // (This part is unchanged)
+    // ... (this part is unchanged)
     for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.lifespan--;
-      if (p.lifespan <= 0) {
-        this.particles.splice(i, 1);
-        continue;
-      }
-      this.particleCtx.fillStyle = p.color;
-      this.particleCtx.fillRect(p.x, p.y, p.size, p.size);
+        const p = this.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.lifespan--;
+        if (p.lifespan <= 0) { this.particles.splice(i, 1); continue; }
+        this.particleCtx.fillStyle = p.color;
+        this.particleCtx.fillRect(p.x, p.y, p.size, p.size);
     }
-
+    
     requestAnimationFrame(this._animationLoop.bind(this));
-  },
+},
   
 _killEnemy: function(enemy) {
     this.scheduler.remove(enemy);
