@@ -1,4 +1,6 @@
 const Game = {
+  backgroundCanvas: null,
+  bgCtx: null,
   display: null,
   chunks: {},
   player: null,
@@ -18,93 +20,123 @@ const Game = {
   CHUNK_WIDTH: 32,
   CHUNK_HEIGHT: 32,
   // in game.js
-// in game.js
-// in game.js
-_spawnEnemy: function() {
+  // in game.js
+  // in game.js
+  _spawnEnemy: function () {
     let x, y;
     do {
-        x = this.player.x + Math.floor((Math.random() - 0.5) * this.DISPLAY_WIDTH);
-        y = this.player.y + Math.floor((Math.random() - 0.5) * this.DISPLAY_HEIGHT);
-    } while (this._getTileAt(x, y) !== '.');
+      x =
+        this.player.x + Math.floor((Math.random() - 0.5) * this.DISPLAY_WIDTH);
+      y =
+        this.player.y + Math.floor((Math.random() - 0.5) * this.DISPLAY_HEIGHT);
+    } while (this._getTileAt(x, y) !== ".");
 
     const enemy = {
-        x: x, y: y,
-        char: 'Č', color: '#654321',
-        hp: 1.0, game: this,
-        isAiming: false, // Add aiming flag
+      x: x,
+      y: y,
+      char: "Č",
+      color: "#654321",
+      hp: 1.0,
+      game: this,
+      isAiming: false, // Add aiming flag
 
-        act: function() {
-            if (this.game.player.hp <= 0) { return; }
-
-            const p = this.game.player;
-            const distance = Math.hypot(p.x - this.x, p.y - this.y);
-            const SHOOT_RANGE = 12;
-
-            // Check for Line of Sight
-            let has_los = false;
-            if (distance <= SHOOT_RANGE) {
-                const line = this.game._getLine(this.x, this.y, p.x, p.y);
-                let is_clear = true;
-                for (let i = 1; i < line.length - 1; i++) {
-                    if (this.game._getTileAt(line[i].x, line[i].y) !== '.') {
-                        is_clear = false;
-                        break;
-                    }
-                }
-                if (is_clear) { has_los = true; }
-            }
-
-            // AI Decision: Aim, Shoot, or Move
-            if (this.isAiming) {
-                // Was aiming last turn. Now, shoot!
-                this.isAiming = false; // Reset state
-                if (has_los) { // Re-check LOS in case player moved
-                    this.game._playerHit(this);
-                }
-            } else if (has_los) {
-                // Has a clear shot, so take a turn to aim.
-                this.isAiming = true;
-            } else {
-                // No shot, so move.
-                const passableCallback = (x, y) => (this.game._getTileAt(x, y) === '.');
-                const astar = new ROT.Path.AStar(p.x, p.y, passableCallback, { topology: 8 });
-                const path = [];
-                astar.compute(this.x, this.y, (x, y) => { path.push({x, y}); });
-                if (path.length > 1) {
-                    this.x = path[1].x;
-                    this.y = path[1].y;
-                }
-            }
+      act: function () {
+        if (this.game.player.hp <= 0) {
+          return;
         }
+
+        const p = this.game.player;
+        const distance = Math.hypot(p.x - this.x, p.y - this.y);
+        const SHOOT_RANGE = 12;
+
+        // Check for Line of Sight
+        let has_los = false;
+        if (distance <= SHOOT_RANGE) {
+          const line = this.game._getLine(this.x, this.y, p.x, p.y);
+          let is_clear = true;
+          for (let i = 1; i < line.length - 1; i++) {
+            if (this.game._getTileAt(line[i].x, line[i].y) !== ".") {
+              is_clear = false;
+              break;
+            }
+          }
+          if (is_clear) {
+            has_los = true;
+          }
+        }
+
+        // AI Decision: Aim, Shoot, or Move
+        if (this.isAiming) {
+          // Was aiming last turn. Now, shoot!
+          this.isAiming = false; // Reset state
+          if (has_los) {
+            // Re-check LOS in case player moved
+            this.game._playerHit(this);
+          }
+        } else if (has_los) {
+          // Has a clear shot, so take a turn to aim.
+          this.isAiming = true;
+        } else {
+          // No shot, so move.
+          const passableCallback = (x, y) => this.game._getTileAt(x, y) === ".";
+          const astar = new ROT.Path.AStar(p.x, p.y, passableCallback, {
+            topology: 8,
+          });
+          const path = [];
+          astar.compute(this.x, this.y, (x, y) => {
+            path.push({ x, y });
+          });
+          if (path.length > 1) {
+            this.x = path[1].x;
+            this.y = path[1].y;
+          }
+        }
+      },
     };
     this.enemies.push(enemy);
     this.scheduler.add(enemy, true);
-},
-// in game.js
-init: function() {
-    this.display = new ROT.Display({ 
-        width: this.DISPLAY_WIDTH, 
-        height: this.DISPLAY_HEIGHT, 
-        fontSize: 20,
-        forceSquareRatio: true
+  },
+  // in game.js
+  init: function () {
+    // Make the rot-js display transparent
+    this.display = new ROT.Display({
+      width: this.DISPLAY_WIDTH,
+      height: this.DISPLAY_HEIGHT,
+      fontSize: 20,
+      forceSquareRatio: true,
+      bg: "transparent", // KEY CHANGE
     });
+
     const gameContainer = document.getElementById("game-container");
     const rotCanvas = this.display.getContainer();
-    rotCanvas.style.zIndex = "1";
+    rotCanvas.style.zIndex = "2"; // Middle layer
     gameContainer.prepend(rotCanvas);
+
     gameContainer.style.width = `${rotCanvas.width}px`;
     gameContainer.style.height = `${rotCanvas.height}px`;
+
+    // Setup background canvas
+    this.backgroundCanvas = document.getElementById("background-canvas");
+    this.backgroundCanvas.width = rotCanvas.width;
+    this.backgroundCanvas.height = rotCanvas.height;
+    this.bgCtx = this.backgroundCanvas.getContext("2d");
+
+    // Setup particle canvas (top layer)
     this.particleCanvas = document.getElementById("particle-canvas");
     this.particleCanvas.width = rotCanvas.width;
     this.particleCanvas.height = rotCanvas.height;
     this.particleCtx = this.particleCanvas.getContext("2d");
+
     this.cellWidth = this.particleCanvas.width / this.DISPLAY_WIDTH;
     this.cellHeight = this.particleCanvas.height / this.DISPLAY_HEIGHT;
 
-this.player = { 
-        x: 0, y: 0, ammo: 6,
-        isAiming: false, aimAngle: 0,
-        hp: 10 // Add health to the player
+    this.player = {
+      x: 0,
+      y: 0,
+      ammo: 6,
+      isAiming: false,
+      aimAngle: 0,
+      hp: 10, // Add health to the player
     };
 
     // MOVED UP: Initialize the scheduler and engine first
@@ -113,15 +145,17 @@ this.player = {
     this.engine = new ROT.Engine(this.scheduler);
 
     // NOW spawn the enemies, which adds them to the scheduler
-    for (let i = 0; i < 5; i++) { this._spawnEnemy(); }
+    for (let i = 0; i < 5; i++) {
+      this._spawnEnemy();
+    }
 
     this._drawAll();
     this._updateUI();
-    
+
     // Start the game loop and animation loop
     this.engine.start();
     this._animationLoop();
-},
+  },
 
   act: function () {
     this.engine.lock();
@@ -167,10 +201,12 @@ this.player = {
     }
   },
 
-// in game.js
-_fireShot: function() {
-    if (this.player.ammo <= 0) { return; }
-    
+  // in game.js
+  _fireShot: function () {
+    if (this.player.ammo <= 0) {
+      return;
+    }
+
     this.player.ammo--;
     const p = this.player;
     const rad = p.aimAngle * (Math.PI / 180);
@@ -182,116 +218,141 @@ _fireShot: function() {
     const line = this._getLine(p.x, p.y, endX, endY);
 
     for (let i = 1; i < line.length; i++) {
-        const point = line[i];
-        
-        const enemy = this.enemies.find(e => e.x === point.x && e.y === point.y && e.hp > 0);
-        if (enemy) {
-            const damage = Math.random() * 0.6 + 0.5;
-            enemy.hp -= damage;
-            
-            // More particles for closer enemies
-            const distance = Math.hypot(enemy.x - p.x, enemy.y - p.y);
-            const particleCount = Math.max(5, Math.floor(25 - distance));
-            this._createSplatterEffect(enemy.x, enemy.y, aimVector, 'blood', particleCount);
+      const point = line[i];
 
-            if (enemy.hp <= 0) {
-                this._killEnemy(enemy);
-            }
-            break;
-        }
+      const enemy = this.enemies.find(
+        (e) => e.x === point.x && e.y === point.y && e.hp > 0,
+      );
+      if (enemy) {
+        const damage = Math.random() * 0.6 + 0.5;
+        enemy.hp -= damage;
 
-        const tile = this._getTileAt(point.x, point.y);
-        if (tile === '#') {
-            this._createRicochetEffect(point.x, point.y, aimVector);
-            break;
+        // More particles for closer enemies
+        const distance = Math.hypot(enemy.x - p.x, enemy.y - p.y);
+        const particleCount = Math.max(5, Math.floor(25 - distance));
+        this._createSplatterEffect(
+          enemy.x,
+          enemy.y,
+          aimVector,
+          "blood",
+          particleCount,
+        );
+
+        if (enemy.hp <= 0) {
+          this._killEnemy(enemy);
         }
-        if (tile === '🌵') {
-            this._createSplatterEffect(point.x, point.y, aimVector, 'cactus', 10);
-            break;
-        }
+        break;
+      }
+
+      const tile = this._getTileAt(point.x, point.y);
+      if (tile === "#") {
+        this._createRicochetEffect(point.x, point.y, aimVector);
+        break;
+      }
+      if (tile === "🌵") {
+        this._createSplatterEffect(point.x, point.y, aimVector, "cactus", 10);
+        break;
+      }
     }
-    
+
     this.player.isAiming = false;
     this._drawAll(); // FIXED: Redraw the screen immediately
     this._updateUI();
     window.removeEventListener("keydown", this);
     this.engine.unlock();
-},
+  },
 
-// in game.js
-_createSplatterEffect: function(worldX, worldY, shotVector, type, particleCount) {
+  // in game.js
+  _createSplatterEffect: function (
+    worldX,
+    worldY,
+    shotVector,
+    type,
+    particleCount,
+  ) {
     let landingX, landingY;
-    
-    if (type === 'corpse') {
-        // Corpse blood pool forms directly on the tile
-        landingX = worldX;
-        landingY = worldY;
+
+    if (type === "corpse") {
+      // Corpse blood pool forms directly on the tile
+      landingX = worldX;
+      landingY = worldY;
     } else {
-        // Other splatters land behind the target
-        landingX = worldX + Math.round(shotVector.x * (Math.random() * 1.5 + 1));
-        landingY = worldY + Math.round(shotVector.y * (Math.random() * 1.5 + 1));
+      // Other splatters land behind the target
+      landingX = worldX + Math.round(shotVector.x * (Math.random() * 1.5 + 1));
+      landingY = worldY + Math.round(shotVector.y * (Math.random() * 1.5 + 1));
     }
 
-    if (this._getTileAt(landingX, landingY) !== '.') { return; }
-    
+    if (this._getTileAt(landingX, landingY) !== ".") {
+      return;
+    }
+
     const chunkX = Math.floor(landingX / this.CHUNK_WIDTH);
     const chunkY = Math.floor(landingY / this.CHUNK_HEIGHT);
     const chunkKey = `${chunkX},${chunkY}`;
-    if (!this.effects[chunkKey]) { this.effects[chunkKey] = {}; }
+    if (!this.effects[chunkKey]) {
+      this.effects[chunkKey] = {};
+    }
 
-    const localX = (landingX % this.CHUNK_WIDTH + this.CHUNK_WIDTH) % this.CHUNK_WIDTH;
-    const localY = (landingY % this.CHUNK_HEIGHT + this.CHUNK_HEIGHT) % this.CHUNK_HEIGHT;
+    const localX =
+      ((landingX % this.CHUNK_WIDTH) + this.CHUNK_WIDTH) % this.CHUNK_WIDTH;
+    const localY =
+      ((landingY % this.CHUNK_HEIGHT) + this.CHUNK_HEIGHT) % this.CHUNK_HEIGHT;
     const tileKey = `${localX},${localY}`;
 
-    const colors = type === 'blood' || type === 'corpse'
+    const colors =
+      type === "blood" || type === "corpse"
         ? ["#8B0000", "#DC143C", "#B22222"]
         : ["#2E8B57", "#3CB371", "#006400"];
 
     const droplets = this.effects[chunkKey][tileKey] || [];
     for (let i = 0; i < particleCount; i++) {
-        droplets.push({
-            dx: (Math.random() - 0.5) * this.cellWidth,
-            dy: (Math.random() - 0.5) * this.cellHeight,
-            size: Math.random() * 2 + 1,
-            color: colors[Math.floor(Math.random() * colors.length)]
-        });
+      droplets.push({
+        dx: (Math.random() - 0.5) * this.cellWidth,
+        dy: (Math.random() - 0.5) * this.cellHeight,
+        size: Math.random() * 2 + 1,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      });
     }
     this.effects[chunkKey][tileKey] = droplets;
-},
+  },
 
- _handleMovementInput: function(code) {
+  _handleMovementInput: function (code) {
     const keyMap = {
-        [ROT.KEYS.VK_UP]:    {x: 0, y: -1},
-        [ROT.KEYS.VK_DOWN]:  {x: 0, y: 1},
-        [ROT.KEYS.VK_LEFT]:  {x: -1, y: 0},
-        [ROT.KEYS.VK_RIGHT]: {x: 1, y: 0}
+      [ROT.KEYS.VK_UP]: { x: 0, y: -1 },
+      [ROT.KEYS.VK_DOWN]: { x: 0, y: 1 },
+      [ROT.KEYS.VK_LEFT]: { x: -1, y: 0 },
+      [ROT.KEYS.VK_RIGHT]: { x: 1, y: 0 },
     };
-    if (!(code in keyMap)) { return; }
+    if (!(code in keyMap)) {
+      return;
+    }
 
     const diff = keyMap[code];
     const newX = this.player.x + diff.x;
     const newY = this.player.y + diff.y;
 
     // Check for corpse to loot before moving
-    const targetEnemy = this.enemies.find(e => e.x === newX && e.y === newY);
-    if (targetEnemy && targetEnemy.char === '†' && !targetEnemy.looted) {
-        this.player.ammo = Math.min(6, this.player.ammo + 2); // Add 2 ammo, cap at 6
-        targetEnemy.looted = true;
-        targetEnemy.color = '#4a0101'; // Make corpse a duller red
+    const targetEnemy = this.enemies.find((e) => e.x === newX && e.y === newY);
+    if (targetEnemy && targetEnemy.char === "†" && !targetEnemy.looted) {
+      this.player.ammo = Math.min(6, this.player.ammo + 2); // Add 2 ammo, cap at 6
+      targetEnemy.looted = true;
+      targetEnemy.color = "#4a0101"; // Make corpse a duller red
     }
 
     const tile = this._getTileAt(newX, newY);
-    if (tile === '#' || tile === '🌵') { return; }
-    
+    if (tile === "#" || tile === "🌵") {
+      return;
+    }
+
     this.player.x = newX;
     this.player.y = newY;
-    
+
     window.removeEventListener("keydown", this);
     this.engine.unlock();
-    
+
     this._drawAll();
     this._updateUI();
-},
+  },
 
   // ... (rest of the functions like _getTileAt, _generateChunk, etc. remain the same)
 
@@ -329,12 +390,12 @@ _createSplatterEffect: function(worldX, worldY, shotVector, type, particleCount)
           : ".";
     });
   },
-_updateUI: function() {
+  _updateUI: function () {
     const ui = document.getElementById("game-ui");
     const aimingText = this.player.isAiming ? " [AIMING]" : "";
     // Add HP to the UI display
     ui.textContent = `HP: ${this.player.hp}/10 | Ammo: ${this.player.ammo}/6${aimingText}`;
-},
+  },
   _worldToScreen: function (worldX, worldY) {
     const topLeftX = this.player.x - Math.floor(this.DISPLAY_WIDTH / 2);
     const topLeftY = this.player.y - Math.floor(this.DISPLAY_HEIGHT / 2);
@@ -356,26 +417,7 @@ _updateUI: function() {
     this._drawEntities();
     this._updateUI(); // Also update UI on draw
   },
-  _drawEntities: function () {
-    // Draw enemies first
-    this.enemies.forEach((enemy) => {
-      const screenPos = this._worldToScreen(enemy.x, enemy.y);
-      if (screenPos) {
-        this.display.draw(
-          screenPos.x,
-          screenPos.y,
-          enemy.char,
-          enemy.color,
-          "#D2B48C",
-        );
-      }
-    });
 
-    // Draw player on top
-    const centerX = Math.floor(this.DISPLAY_WIDTH / 2);
-    const centerY = Math.floor(this.DISPLAY_HEIGHT / 2);
-    this.display.draw(centerX, centerY, "@", "#FFD700", "#D2B48C");
-  },
   _getLine: function (x0, y0, x1, y1) {
     const points = [];
     const dx = Math.abs(x1 - x0);
@@ -441,44 +483,47 @@ _updateUI: function() {
     }
   },
   // in game.js
-_playerHit: function(enemy) {
+  _playerHit: function (enemy) {
     this.player.hp--;
     this._updateUI();
 
     // Trigger the screen flash
     const flash = document.getElementById("flash-overlay");
     flash.style.display = "block";
-    setTimeout(() => { flash.style.display = "none"; }, 100);
+    setTimeout(() => {
+      flash.style.display = "none";
+    }, 100);
 
     // Draw a tracer line from the enemy
     const startPos = this._worldToScreen(enemy.x, enemy.y);
     if (startPos) {
-        const startPixelX = (startPos.x * this.cellWidth) + (this.cellWidth / 2);
-        const startPixelY = (startPos.y * this.cellHeight) + (this.cellHeight / 2);
-        const endPixelX = this.particleCanvas.width / 2;
-        const endPixelY = this.particleCanvas.height / 2;
-        
-        this.particles.push({
-            x: startPixelX, y: startPixelY,
-            vx: (endPixelX - startPixelX) / 5, // Travel in 5 frames
-            vy: (endPixelY - startPixelY) / 5,
-            lifespan: 5,
-            color: "rgba(255, 100, 100, 0.8)",
-            size: 2
-        });
+      const startPixelX = startPos.x * this.cellWidth + this.cellWidth / 2;
+      const startPixelY = startPos.y * this.cellHeight + this.cellHeight / 2;
+      const endPixelX = this.particleCanvas.width / 2;
+      const endPixelY = this.particleCanvas.height / 2;
+
+      this.particles.push({
+        x: startPixelX,
+        y: startPixelY,
+        vx: (endPixelX - startPixelX) / 5, // Travel in 5 frames
+        vy: (endPixelY - startPixelY) / 5,
+        lifespan: 5,
+        color: "rgba(255, 100, 100, 0.8)",
+        size: 2,
+      });
     }
 
     if (this.player.hp <= 0) {
-        this._gameOver();
+      this._gameOver();
     }
-},
+  },
 
-_gameOver: function() {
+  _gameOver: function () {
     this.engine.lock(); // Stop the game
     const ui = document.getElementById("game-ui");
     ui.textContent = "YOU DIED";
     ui.style.color = "red";
-},
+  },
   // in game.js
   _createRicochetEffect: function (worldX, worldY, shotVector) {
     const screenPos = this._worldToScreen(worldX, worldY);
@@ -511,146 +556,200 @@ _gameOver: function() {
     }
   },
 
-// in game.js
-_animationLoop: function() {
-    this.particleCtx.clearRect(0, 0, this.particleCanvas.width, this.particleCanvas.height);
+  // in game.js
+  _animationLoop: function () {
+    this.particleCtx.clearRect(
+      0,
+      0,
+      this.particleCanvas.width,
+      this.particleCanvas.height,
+    );
 
     // --- 1a. DRAW PLAYER AIM LINE ---
     if (this.player.isAiming) {
-        // ... (this part is unchanged)
-        const p = this.player;
-        const rad = p.aimAngle * (Math.PI / 180);
-        const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
-        const maxRange = 20;
-        const endX = Math.round(p.x + aimVector.x * maxRange);
-        const endY = Math.round(p.y + aimVector.y * maxRange);
-        const line = this._getLine(p.x, p.y, endX, endY);
-        let finalPoint = line[line.length - 1];
-        for (let i = 1; i < line.length; i++) {
-            const point = line[i];
-            if (this._getTileAt(point.x, point.y) !== '.') {
-                finalPoint = point;
-                break;
-            }
+      // ... (this part is unchanged)
+      const p = this.player;
+      const rad = p.aimAngle * (Math.PI / 180);
+      const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
+      const maxRange = 20;
+      const endX = Math.round(p.x + aimVector.x * maxRange);
+      const endY = Math.round(p.y + aimVector.y * maxRange);
+      const line = this._getLine(p.x, p.y, endX, endY);
+      let finalPoint = line[line.length - 1];
+      for (let i = 1; i < line.length; i++) {
+        const point = line[i];
+        if (this._getTileAt(point.x, point.y) !== ".") {
+          finalPoint = point;
+          break;
         }
-        const startGridX = Math.floor(this.DISPLAY_WIDTH / 2);
-        const startGridY = Math.floor(this.DISPLAY_HEIGHT / 2);
-        const startPixelX = (startGridX * this.cellWidth) + (this.cellWidth / 2);
-        const startPixelY = (startGridY * this.cellHeight) + (this.cellHeight / 2);
-        const endScreenGrid = this._worldToScreen(finalPoint.x, finalPoint.y);
-        if (endScreenGrid) {
-            const endPixelX = (endScreenGrid.x * this.cellWidth) + (this.cellWidth / 2);
-            const endPixelY = (endScreenGrid.y * this.cellHeight) + (this.cellHeight / 2);
-            this.particleCtx.beginPath();
-            this.particleCtx.setLineDash([5, 5]);
-            this.particleCtx.moveTo(startPixelX, startPixelY);
-            this.particleCtx.lineTo(endPixelX, endPixelY);
-            this.particleCtx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-            this.particleCtx.lineWidth = 2;
-            this.particleCtx.stroke();
-            this.particleCtx.setLineDash([]);
-        }
+      }
+      const startGridX = Math.floor(this.DISPLAY_WIDTH / 2);
+      const startGridY = Math.floor(this.DISPLAY_HEIGHT / 2);
+      const startPixelX = startGridX * this.cellWidth + this.cellWidth / 2;
+      const startPixelY = startGridY * this.cellHeight + this.cellHeight / 2;
+      const endScreenGrid = this._worldToScreen(finalPoint.x, finalPoint.y);
+      if (endScreenGrid) {
+        const endPixelX = endScreenGrid.x * this.cellWidth + this.cellWidth / 2;
+        const endPixelY =
+          endScreenGrid.y * this.cellHeight + this.cellHeight / 2;
+        this.particleCtx.beginPath();
+        this.particleCtx.setLineDash([5, 5]);
+        this.particleCtx.moveTo(startPixelX, startPixelY);
+        this.particleCtx.lineTo(endPixelX, endPixelY);
+        this.particleCtx.strokeStyle = "rgba(255, 255, 0, 0.5)";
+        this.particleCtx.lineWidth = 2;
+        this.particleCtx.stroke();
+        this.particleCtx.setLineDash([]);
+      }
     }
 
     // --- 1b. DRAW ENEMY AIM LINES ---
-    this.enemies.forEach(enemy => {
-        if (enemy.isAiming && enemy.hp > 0) {
-            const startPos = this._worldToScreen(enemy.x, enemy.y);
-            if (startPos) {
-                const startPixelX = (startPos.x * this.cellWidth) + (this.cellWidth / 2);
-                const startPixelY = (startPos.y * this.cellHeight) + (this.cellHeight / 2);
-                const endPixelX = (Math.floor(this.DISPLAY_WIDTH / 2) * this.cellWidth) + (this.cellWidth / 2);
-                const endPixelY = (Math.floor(this.DISPLAY_HEIGHT / 2) * this.cellHeight) + (this.cellHeight / 2);
+    this.enemies.forEach((enemy) => {
+      if (enemy.isAiming && enemy.hp > 0) {
+        const startPos = this._worldToScreen(enemy.x, enemy.y);
+        if (startPos) {
+          const startPixelX = startPos.x * this.cellWidth + this.cellWidth / 2;
+          const startPixelY =
+            startPos.y * this.cellHeight + this.cellHeight / 2;
+          const endPixelX =
+            Math.floor(this.DISPLAY_WIDTH / 2) * this.cellWidth +
+            this.cellWidth / 2;
+          const endPixelY =
+            Math.floor(this.DISPLAY_HEIGHT / 2) * this.cellHeight +
+            this.cellHeight / 2;
 
-                this.particleCtx.beginPath();
-                this.particleCtx.moveTo(startPixelX, startPixelY);
-                this.particleCtx.lineTo(endPixelX, endPixelY);
-                this.particleCtx.strokeStyle = 'rgba(255, 0, 0, 0.3)'; // Faint red
-                this.particleCtx.lineWidth = 1;
-                this.particleCtx.stroke();
-            }
+          this.particleCtx.beginPath();
+          this.particleCtx.moveTo(startPixelX, startPixelY);
+          this.particleCtx.lineTo(endPixelX, endPixelY);
+          this.particleCtx.strokeStyle = "rgba(255, 0, 0, 0.3)"; // Faint red
+          this.particleCtx.lineWidth = 1;
+          this.particleCtx.stroke();
         }
+      }
     });
-
-    // --- 2. DRAW PERSISTENT SPLATTERS ---
-    // ... (this part is unchanged)
-    for (const chunkKey in this.effects) {
-        for (const tileKey in this.effects[chunkKey]) {
-            const droplets = this.effects[chunkKey][tileKey];
-            const [chunkX, chunkY] = chunkKey.split(',').map(Number);
-            const [localX, localY] = tileKey.split(',').map(Number);
-            const worldX = chunkX * this.CHUNK_WIDTH + localX;
-            const worldY = chunkY * this.CHUNK_HEIGHT + localY;
-            const screenPos = this._worldToScreen(worldX, worldY);
-            if (screenPos) {
-                const originX = (screenPos.x * this.cellWidth) + (this.cellWidth / 2);
-                const originY = (screenPos.y * this.cellHeight) + (this.cellHeight / 2);
-                for (const droplet of droplets) {
-                    this.particleCtx.fillStyle = droplet.color;
-                    this.particleCtx.fillRect(originX + droplet.dx, originY + droplet.dy, droplet.size, droplet.size);
-                }
-            }
-        }
-    }
 
     // --- 3. ANIMATE TEMPORARY PARTICLES ---
     // ... (this part is unchanged)
     for (let i = this.particles.length - 1; i >= 0; i--) {
-        const p = this.particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.lifespan--;
-        if (p.lifespan <= 0) { this.particles.splice(i, 1); continue; }
-        this.particleCtx.fillStyle = p.color;
-        this.particleCtx.fillRect(p.x, p.y, p.size, p.size);
+      const p = this.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.lifespan--;
+      if (p.lifespan <= 0) {
+        this.particles.splice(i, 1);
+        continue;
+      }
+      this.particleCtx.fillStyle = p.color;
+      this.particleCtx.fillRect(p.x, p.y, p.size, p.size);
     }
-    
+
     requestAnimationFrame(this._animationLoop.bind(this));
-},
-  
-_killEnemy: function(enemy) {
+  },
+
+  _killEnemy: function (enemy) {
     this.scheduler.remove(enemy);
-    enemy.char = '†';
-    enemy.color = '#8B0000';
+    enemy.char = "†";
+    enemy.color = "#8B0000";
     enemy.looted = false; // Add a flag to prevent repeat looting
 
     // Create a blood pool directly under the corpse
-    this._createSplatterEffect(enemy.x, enemy.y, {x:0, y:0}, 'corpse', 15);
-},
+    this._createSplatterEffect(enemy.x, enemy.y, { x: 0, y: 0 }, "corpse", 15);
+  },
+  // in game.js
   _drawMap: function () {
     const topLeftX = this.player.x - Math.floor(this.DISPLAY_WIDTH / 2);
     const topLeftY = this.player.y - Math.floor(this.DISPLAY_HEIGHT / 2);
 
+    // Clear the background canvas
+    this.bgCtx.clearRect(
+      0,
+      0,
+      this.backgroundCanvas.width,
+      this.backgroundCanvas.height,
+    );
+    this.bgCtx.font = `${this.display.getOptions().fontSize}px monospace`;
+    this.bgCtx.textAlign = "center";
+    this.bgCtx.textBaseline = "middle";
+
+    // Draw terrain
     for (let y = 0; y < this.DISPLAY_HEIGHT; y++) {
       for (let x = 0; x < this.DISPLAY_WIDTH; x++) {
         const worldX = topLeftX + x;
         const worldY = topLeftY + y;
         const tile = this._getTileAt(worldX, worldY);
 
-        let char = tile;
-        let fg = null;
-        // Set the default background for ALL tiles to be sand color
-        let bg = "#D2B48C";
+        const pixelX = x * this.cellWidth;
+        const pixelY = y * this.cellHeight;
 
-        if (tile === ".") {
-          char = null; // For floor, just show the background
-        } else if (tile === "#") {
-          fg = "#8B4513"; // For rock, draw this char on the sand bg
+        // Always draw the sand background
+        this.bgCtx.fillStyle = "#D2B48C";
+        this.bgCtx.fillRect(pixelX, pixelY, this.cellWidth, this.cellHeight);
+
+        if (tile === "#") {
+          this.bgCtx.fillStyle = "#8B4513";
+          this.bgCtx.fillText(
+            tile,
+            pixelX + this.cellWidth / 2,
+            pixelY + this.cellHeight / 2,
+          );
         } else if (tile === "🌵") {
-          fg = "#2E8B57"; // For cactus, draw this char on the sand bg
+          this.bgCtx.fillStyle = "#2E8B57";
+          this.bgCtx.fillText(
+            tile,
+            pixelX + this.cellWidth / 2,
+            pixelY + this.cellHeight / 2,
+          );
         }
+      }
+    }
 
-        this.display.draw(x, y, char, fg, bg);
+    // Draw persistent splatters on top of the terrain
+    for (const chunkKey in this.effects) {
+      for (const tileKey in this.effects[chunkKey]) {
+        const droplets = this.effects[chunkKey][tileKey];
+        const [chunkX, chunkY] = chunkKey.split(",").map(Number);
+        const [localX, localY] = tileKey.split(",").map(Number);
+        const worldX = chunkX * this.CHUNK_WIDTH + localX;
+        const worldY = chunkY * this.CHUNK_HEIGHT + localY;
+        const screenPos = this._worldToScreen(worldX, worldY);
+        if (screenPos) {
+          const originX = screenPos.x * this.cellWidth + this.cellWidth / 2;
+          const originY = screenPos.y * this.cellHeight + this.cellHeight / 2;
+          for (const droplet of droplets) {
+            this.bgCtx.fillStyle = droplet.color;
+            this.bgCtx.fillRect(
+              originX + droplet.dx,
+              originY + droplet.dy,
+              droplet.size,
+              droplet.size,
+            );
+          }
+        }
       }
     }
   },
-  _drawPlayer: function () {
+
+  _drawEntities: function () {
+    this.display.clear(); // Clear the transparent middle canvas
+
+    // Draw enemies
+    this.enemies.forEach((enemy) => {
+      const screenPos = this._worldToScreen(enemy.x, enemy.y);
+      if (screenPos) {
+        this.display.draw(
+          screenPos.x,
+          screenPos.y,
+          enemy.char,
+          enemy.color,
+          null,
+        );
+      }
+    });
+
+    // Draw player on top
     const centerX = Math.floor(this.DISPLAY_WIDTH / 2);
     const centerY = Math.floor(this.DISPLAY_HEIGHT / 2);
-    const sandColor = "#D2B48C";
-
-    // Add the sand color as the 5th argument (background color)
-    this.display.draw(centerX, centerY, "@", "#993300", sandColor);
+    this.display.draw(centerX, centerY, "@", "#773300", null);
   },
 };
 

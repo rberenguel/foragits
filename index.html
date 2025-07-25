@@ -1,58 +1,63 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <title>Western Roguelike</title>
+  <head>
+    <meta charset="utf-8" />
+    <title>Foragits</title>
     <style>
-        body {
-            background-color: #333;
-            color: #eee;
-            font-family: monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        #game-container {
-            position: relative;
-        }
-        #game-container canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        #particle-canvas {
-            z-index: 2;
-            pointer-events: none;
-        }
-        #game-ui {
-            margin-bottom: 10px;
-            font-size: 1.2em;
-        }
-        /* New element for the damage flash effect */
-        #flash-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 0, 0, 0.3);
-            z-index: 100;
-            pointer-events: none;
-            display: none; /* Hidden by default */
-        }
+      body {
+        background-color: #333;
+        color: #eee;
+        font-family: monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      #game-container {
+        position: relative;
+      }
+      #game-container canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      #background-canvas {
+        z-index: 1; /* Bottom layer */
+      }
+      /* The rot-js canvas will be programmatically set to z-index 2 */
+      #particle-canvas {
+        z-index: 3; /* Top layer for effects */
+        pointer-events: none;
+      }
+      #game-ui {
+        margin-bottom: 10px;
+        font-size: 1.2em;
+      }
+      #flash-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 0, 0, 0.3);
+        z-index: 100;
+        pointer-events: none;
+        display: none;
+      }
     </style>
-</head>
-<body>
-    <h1>Dust & Devils</h1>
+  </head>
+  <body>
+    <h1>Foragits</h1>
     <div id="game-ui"></div>
-    <div id="flash-overlay"></div> <!-- Add this element -->
+    <div id="flash-overlay"></div>
     <div id="game-container">
-        <canvas id="particle-canvas"></canvas>
+      <!-- Add the new background canvas -->
+      <canvas id="background-canvas"></canvas>
+      <canvas id="particle-canvas"></canvas>
     </div>
-    <script src="rot-2.2.1.js"></script>
+    <script src="./rot-2.2.1.js"></script>
     <script src="game.js"></script>
-</body>
+  </body>
 </html>
