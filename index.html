@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Foragits</title>
+    <style>
+      body {
+        background-color: #333;
+        color: #eee;
+        font-family: monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      #game-container {
+        position: relative; /* This is the anchor for the canvases */
+      }
+      #game-container canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        /* The rot-js canvas will be added at z-index 1 */
+      }
+      #particle-canvas {
+        z-index: 2; /* Ensure particle canvas is on top */
+        pointer-events: none; /* Make it transparent to mouse events */
+      }
+      #game-ui {
+        margin-bottom: 10px;
+        font-size: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Western Roguelike</h1>
+    <div id="game-ui"></div>
+    <div id="game-container">
+      <canvas id="particle-canvas"></canvas>
+    </div>
+    <script src="./rot-2.2.1.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
