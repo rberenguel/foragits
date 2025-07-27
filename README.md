@@ -20,6 +20,7 @@ The game currently starts with 5 bandits. The objective is to defeat them all. T
 `u` - Use item (near fire pit)
 `i` - Open/Close Inventory
 `d` - Duck behind cover
+`t` - Talk to people
 `?` - Open/Close Help
 `m` - Open/Close Map
 `l` - Look around
