@@ -118,22 +118,22 @@ export class Renderer {
     this.display.drawText(2, 1, "%c{#fff}%b{#333}--- HELP ---");
 
     let y = 3;
-    this.game.helpContent.forEach(line => {
-        let cleanLine = line.replace(/`/g, ''); // remove backticks
+    this.game.helpContent.forEach((line) => {
+      let cleanLine = line.replace(/`/g, ""); // remove backticks
 
-        if (cleanLine.trim().startsWith('### ')) {
-            // It's a level 3 title
-            cleanLine = cleanLine.replace('###', '').trim().toUpperCase();
-            // Style it: yellow text with decoration
-            this.display.drawText(2, y++, `%c{#ff0}--- ${cleanLine} ---`);
-        } else if (cleanLine.trim().startsWith('#### ')) {
-            // It's a level 4 title
-            cleanLine = cleanLine.replace('####', '').trim();
-            // Style it: slightly indented, white text
-            this.display.drawText(4, y++, `%c{#fff}${cleanLine}`);
-        } else {
-            this.display.drawText(2, y++, cleanLine);
-        }
+      if (cleanLine.trim().startsWith("### ")) {
+        // It's a level 3 title
+        cleanLine = cleanLine.replace("###", "").trim().toUpperCase();
+        // Style it: yellow text with decoration
+        this.display.drawText(2, y++, `%c{#ff0}--- ${cleanLine} ---`);
+      } else if (cleanLine.trim().startsWith("#### ")) {
+        // It's a level 4 title
+        cleanLine = cleanLine.replace("####", "").trim();
+        // Style it: slightly indented, white text
+        this.display.drawText(4, y++, `%c{#fff}${cleanLine}`);
+      } else {
+        this.display.drawText(2, y++, cleanLine);
+      }
     });
 
     const closeText = "([?] or [esc] to close)";
@@ -261,8 +261,8 @@ export class Renderer {
     }
     // Only draw enemies if they are visible
     enemies.forEach((enemy) => {
-      const key = `${enemy.x},${enemy.y}`;
-      if (this.visibleTiles.has(key)) {
+      const isVisible = this.visibleTiles.has(`${enemy.x},${enemy.y}`);
+      if (isVisible) {
         const screenPos = this._worldToScreen(
           enemy.x,
           enemy.y,
@@ -271,6 +271,21 @@ export class Renderer {
         );
         if (screenPos)
           this.display.draw(screenPos.x, screenPos.y, enemy.char, enemy.color);
+      }
+    });
+    // Draw NPCs
+    this.game.npcs.forEach((npc) => {
+      const isVisible = this.visibleTiles.has(`${npc.x},${npc.y}`);
+      if (isVisible) {
+        const screenPos = this._worldToScreen(
+          npc.x,
+          npc.y,
+          player.x - Math.floor(DISPLAY_WIDTH / 2),
+          player.y - Math.floor(DISPLAY_HEIGHT / 2),
+        );
+        if (screenPos) {
+          this.display.draw(screenPos.x, screenPos.y, npc.char, npc.color);
+        }
       }
     });
 
@@ -282,66 +297,85 @@ export class Renderer {
     );
   }
 
- _drawSplatters(world, topLeftX, topLeftY) {
+  _drawSplatters(world, topLeftX, topLeftY) {
     const LIFESPAN = 1000;
     const DARK_AGE = 300;
     const FADE_AGE = 700;
 
     // Use for...of for easier modification/deletion
     for (const chunkKey of Object.keys(world.effects)) {
-        for (const tileKey of Object.keys(world.effects[chunkKey])) {
-            const droplets = world.effects[chunkKey][tileKey];
-            
-            // 1. Filter out expired droplets (garbage collection)
-            const remainingDroplets = droplets.filter(d => (this.game.turn - d.createdAt) < LIFESPAN);
-            if (remainingDroplets.length === 0) {
-                delete world.effects[chunkKey][tileKey];
-                continue; // Move to the next tileKey
-            }
-            world.effects[chunkKey][tileKey] = remainingDroplets;
+      for (const tileKey of Object.keys(world.effects[chunkKey])) {
+        const droplets = world.effects[chunkKey][tileKey];
 
-            // 2. Draw the remaining droplets with aged colors
-            const [chunkX, chunkY] = chunkKey.split(',').map(Number);
-            const [localX, localY] = tileKey.split(',').map(Number);
-            const worldX = chunkX * CHUNK_WIDTH + localX;
-            const worldY = chunkY * CHUNK_HEIGHT + localY;
-            const screenPos = this._worldToScreen(worldX, worldY, topLeftX, topLeftY);
-
-            if (screenPos) {
-                const originX = screenPos.x * this.cellWidth + this.cellWidth / 2;
-                const originY = screenPos.y * this.cellHeight + this.cellHeight / 2;
-                
-                for (const droplet of remainingDroplets) {
-                    const age = this.game.turn - droplet.createdAt;
-                    let color = droplet.color;
-                    
-                    if (age >= FADE_AGE) {
-                        // Phase 3: Fading
-                        const baseColor = ROT.Color.fromString(color);
-                        const darkColor = ROT.Color.interpolate(baseColor, [0, 0, 0], 0.5);
-                        const alpha = 1.0 - ((age - FADE_AGE) / (LIFESPAN - FADE_AGE));
-                        color = `rgba(${darkColor.join(',')},${alpha})`;
-                    } else if (age >= DARK_AGE) {
-                        // Phase 2: Darkened
-                        const baseColor = ROT.Color.fromString(color);
-                        const darkening = ((age - DARK_AGE) / (LIFESPAN - DARK_AGE));
-                        const darkColor = ROT.Color.interpolate(baseColor, [0, 0, 0], darkening);
-                        color = ROT.Color.toRGB(darkColor);
-                    }
-                    // Phase 1 (age < DARK_AGE) uses the original color
-
-                    this.bgCtx.fillStyle = color;
-                    this.bgCtx.fillRect(originX + droplet.dx, originY + droplet.dy, droplet.size, droplet.size);
-                }
-            }
+        // 1. Filter out expired droplets (garbage collection)
+        const remainingDroplets = droplets.filter(
+          (d) => this.game.turn - d.createdAt < LIFESPAN,
+        );
+        if (remainingDroplets.length === 0) {
+          delete world.effects[chunkKey][tileKey];
+          continue; // Move to the next tileKey
         }
-        // Clean up empty chunk keys
-        if (Object.keys(world.effects[chunkKey]).length === 0) {
-            delete world.effects[chunkKey];
+        world.effects[chunkKey][tileKey] = remainingDroplets;
+
+        // 2. Draw the remaining droplets with aged colors
+        const [chunkX, chunkY] = chunkKey.split(",").map(Number);
+        const [localX, localY] = tileKey.split(",").map(Number);
+        const worldX = chunkX * CHUNK_WIDTH + localX;
+        const worldY = chunkY * CHUNK_HEIGHT + localY;
+        const screenPos = this._worldToScreen(
+          worldX,
+          worldY,
+          topLeftX,
+          topLeftY,
+        );
+
+        if (screenPos) {
+          const originX = screenPos.x * this.cellWidth + this.cellWidth / 2;
+          const originY = screenPos.y * this.cellHeight + this.cellHeight / 2;
+
+          for (const droplet of remainingDroplets) {
+            const age = this.game.turn - droplet.createdAt;
+            let color = droplet.color;
+
+            if (age >= FADE_AGE) {
+              // Phase 3: Fading
+              const baseColor = ROT.Color.fromString(color);
+              const darkColor = ROT.Color.interpolate(
+                baseColor,
+                [0, 0, 0],
+                0.5,
+              );
+              const alpha = 1.0 - (age - FADE_AGE) / (LIFESPAN - FADE_AGE);
+              color = `rgba(${darkColor.join(",")},${alpha})`;
+            } else if (age >= DARK_AGE) {
+              // Phase 2: Darkened
+              const baseColor = ROT.Color.fromString(color);
+              const darkening = (age - DARK_AGE) / (LIFESPAN - DARK_AGE);
+              const darkColor = ROT.Color.interpolate(
+                baseColor,
+                [0, 0, 0],
+                darkening,
+              );
+              color = ROT.Color.toRGB(darkColor);
+            }
+            // Phase 1 (age < DARK_AGE) uses the original color
+
+            this.bgCtx.fillStyle = color;
+            this.bgCtx.fillRect(
+              originX + droplet.dx,
+              originY + droplet.dy,
+              droplet.size,
+              droplet.size,
+            );
+          }
         }
+      }
+      // Clean up empty chunk keys
+      if (Object.keys(world.effects[chunkKey]).length === 0) {
+        delete world.effects[chunkKey];
+      }
     }
   }
- 
 
   startAnimationLoop() {
     const loop = () => {
@@ -570,7 +604,7 @@ export class Renderer {
         dy: (Math.random() - 0.5) * this.cellHeight,
         size: Math.random() * 2 + 1,
         color: colors[Math.floor(Math.random() * colors.length)],
-        createdAt: this.game.turn
+        createdAt: this.game.turn,
       });
     }
     this.game.world.effects[chunkKey][tileKey] = droplets;

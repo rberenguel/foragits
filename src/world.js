@@ -1,6 +1,7 @@
 import { CHUNK_WIDTH, CHUNK_HEIGHT, SETTLEMENT_RADIUS } from "./constants.js";
 import { Settlement } from "./features/settlement.js";
 import { TILE_TYPE } from "./terrain.js";
+import { NPC } from "./actors/npc.js";
 
 const META_CHUNK_SIZE = 10; // A settlement can appear in a 10x10 chunk area
 const SETTLEMENT_CHANCE = 0.4; // 40% chance of a settlement in a meta-chunk
@@ -139,6 +140,9 @@ export class World {
 
     const settlement = this._getSettlementForChunk(chunkX, chunkY);
     if (settlement) {
+      if (!settlement.isPopulated) {
+        this._populateSettlement(settlement);
+      }
       // --- REVISED PLACARD AND SETTLEMENT LOGIC ---
 
       // 1. Determine placard location ONCE for the whole settlement
@@ -230,5 +234,30 @@ export class World {
         }
       }
     }
+  }
+  _populateSettlement(settlement) {
+    const npcPerSettlement = 2;
+    for (let i = 0; i < npcPerSettlement; i++) {
+      let x,
+        y,
+        attempts = 0;
+      do {
+        const building =
+          settlement.buildings[
+            Math.floor(Math.random() * settlement.buildings.length)
+          ];
+        if (!building) continue;
+        x = building.x + 1 + Math.floor(Math.random() * (building.width - 2));
+        y = building.y + 1 + Math.floor(Math.random() * (building.height - 2));
+        attempts++;
+      } while (this.game.isTileOccupied(x, y) && attempts < 50);
+
+      if (attempts < 50) {
+        const npc = new NPC(this.game, x, y, settlement);
+        this.game.npcs.push(npc);
+        this.game.scheduler.add(npc, true);
+      }
+    }
+    settlement.isPopulated = true;
   }
 }

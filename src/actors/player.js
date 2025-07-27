@@ -129,6 +129,9 @@ export class Player {
     if (key === "d") {
       tookTurn = this._toggleDuck();
     }
+    if (key === "t") {
+      tookTurn = this._talkToNPC();
+    }
 
     if (this.isAiming) {
       tookTurn = this._handleAimingInput(code);
@@ -358,6 +361,31 @@ export class Player {
 
     this.game.renderer.updateUI();
     return true; // A successful shot takes a turn
+  }
+  _talkToNPC() {
+    let talked = false;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const tileX = this.x + dx;
+        const tileY = this.y + dy;
+
+        const npc = this.game.npcs.find((n) => n.x === tileX && n.y === tileY);
+        if (npc) {
+          this.game.renderer.displayMessage(
+            `"${npc.getNextDialogue()}" -${npc.name}`,
+          );
+          talked = true;
+          break;
+        }
+      }
+      if (talked) break;
+    }
+
+    if (!talked) {
+      this.game.renderer.displayMessage("There's no one here to talk to.");
+    }
+    return talked; // Talking takes a turn if successful
   }
   _toggleDuck() {
     if (this.isDucking) {

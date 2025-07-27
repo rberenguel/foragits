@@ -84,6 +84,7 @@ export class Settlement {
     this.name = generateSettlementName();
     this.buildings = this._generateBuildings();
     this.placard = { x: 0, y: 0 }; // Will be placed by the World generator
+    this.isPopulated = false;
   }
 
   _generateBuildings() {

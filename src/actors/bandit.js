@@ -1,5 +1,5 @@
 import { terrainInfo } from "../terrain.js";
-import { createItem } from '../items.js';
+import { createItem } from "../items.js";
 // --- NEW: BANDIT NAME GENERATOR ---
 const firstNames = [
   "Jed",
@@ -123,11 +123,13 @@ export class Bandit {
     // --- ASSIGN NAME ON CREATION ---
     this.name = generateBanditName();
     this.inventory = [
-        createItem('revolver_rusty'),
-        createItem('ammo_bullet', { quantity: Math.floor(Math.random() * 6) + 1 })
+      createItem("revolver_rusty"),
+      createItem("ammo_bullet", {
+        quantity: Math.floor(Math.random() * 6) + 1,
+      }),
     ];
     if (Math.random() < 0.15) {
-        this.inventory.push(createItem('can_of_beans'));
+      this.inventory.push(createItem("can_of_beans"));
     }
     const lightPasses = (x, y) => {
       const tileChar = this.game.world.getTileAt(x, y);
@@ -135,8 +137,8 @@ export class Bandit {
     };
     this.fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
   }
-getEquippedWeapon() {
-      return this.inventory.find(i => i.type === 'weapon');
+  getEquippedWeapon() {
+    return this.inventory.find((i) => i.type === "weapon");
   }
   act() {
     if (this.game.player.hp <= 0) return;
@@ -163,13 +165,18 @@ getEquippedWeapon() {
 
     // 2. DECISION MAKING
     const target = this.lastKnownPlayerPosition;
-    
+
     if (target) {
       const distance = Math.hypot(this.x - target.x, this.y - target.y);
       const weapon = this.getEquippedWeapon();
 
       // UPDATED: Check for ammo before deciding to shoot
-      if (this.playerIsVisible && distance <= 12 && weapon && weapon.loaded > 0) {
+      if (
+        this.playerIsVisible &&
+        distance <= 12 &&
+        weapon &&
+        weapon.loaded > 0
+      ) {
         if (this.isAiming) {
           this.isAiming = false;
           this.game.attack(this, this.game.player);
@@ -194,26 +201,28 @@ getEquippedWeapon() {
 
   _moveAlongPathTo(target) {
     const passableCallback = (x, y) => {
-        const tile = this.game.world.getTileAt(x, y);
-        if (!terrainInfo[tile]?.isPassable) return false;
-        
-        // The target tile (e.g., player's position) should be considered passable for pathfinding.
-        if (x === target.x && y === target.y) return true;
+      const tile = this.game.world.getTileAt(x, y);
+      if (!terrainInfo[tile]?.isPassable) return false;
 
-        // Don't path through other actors.
-        return !this.game.isTileOccupied(x, y, this);
+      // The target tile (e.g., player's position) should be considered passable for pathfinding.
+      if (x === target.x && y === target.y) return true;
+
+      // Don't path through other actors.
+      return !this.game.isTileOccupied(x, y, this);
     };
-    const astar = new ROT.Path.AStar(target.x, target.y, passableCallback, {topology: 8});
+    const astar = new ROT.Path.AStar(target.x, target.y, passableCallback, {
+      topology: 8,
+    });
     const path = [];
     astar.compute(this.x, this.y, (x, y) => path.push({ x, y }));
 
     if (path.length > 1) {
-        const nextStep = path[1];
-        // Final check before moving to prevent collisions if actors move simultaneously.
-        if (!this.game.isTileOccupied(nextStep.x, nextStep.y, this)) {
-            this.x = nextStep.x;
-            this.y = nextStep.y;
-        }
+      const nextStep = path[1];
+      // Final check before moving to prevent collisions if actors move simultaneously.
+      if (!this.game.isTileOccupied(nextStep.x, nextStep.y, this)) {
+        this.x = nextStep.x;
+        this.y = nextStep.y;
+      }
     }
   }
 
@@ -223,8 +232,8 @@ getEquippedWeapon() {
     if (target) {
       const distance = Math.hypot(this.x - target.x, this.y - target.y);
       if (distance > 200) {
-          this._wanderRandomly();
-          return;
+        this._wanderRandomly();
+        return;
       }
       // Pathfind towards the assigned base settlement
       this._moveAlongPathTo(target);
@@ -236,8 +245,14 @@ getEquippedWeapon() {
 
   _wanderRandomly() {
     const moves = [
-      [-1, 0], [1, 0], [0, -1], [0, 1],
-      [-1, -1], [-1, 1], [1, -1], [1, 1]
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+      [-1, -1],
+      [-1, 1],
+      [1, -1],
+      [1, 1],
     ];
     const validMoves = [];
 
@@ -245,7 +260,10 @@ getEquippedWeapon() {
       const newX = this.x + move[0];
       const newY = this.y + move[1];
       const tile = this.game.world.getTileAt(newX, newY);
-      if (terrainInfo[tile]?.isPassable && !this.game.isTileOccupied(newX, newY, this)) {
+      if (
+        terrainInfo[tile]?.isPassable &&
+        !this.game.isTileOccupied(newX, newY, this)
+      ) {
         validMoves.push(move);
       }
     }

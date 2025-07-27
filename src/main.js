@@ -1,5 +1,6 @@
 import { Player } from "./actors/player.js";
 import { Bandit } from "./actors/bandit.js";
+import { NPC } from "./actors/npc.js";
 import { World } from "./world.js";
 import { Renderer } from "./renderer.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from "./constants.js";
@@ -11,10 +12,11 @@ class Game {
     this.renderer = new Renderer(this);
     this.player = new Player(this, 0, 0);
     this.enemies = [];
+    this.npcs = [];
     this.scheduler = new ROT.Scheduler.Simple();
     this.engine = new ROT.Engine(this.scheduler);
     this.gameState = "playing";
-    this.turn = 0 // Confirm ROT does not have this built-in
+    this.turn = 0; // Confirm ROT does not have this built-in
     this.helpContent = [];
   }
 
@@ -24,51 +26,53 @@ class Game {
       .getElementById("help-button")
       .addEventListener("click", () => this.toggleHelp());
     for (let i = 0; i < 5; i++) this._spawnEnemy();
-const turnManager = {
-        act: () => {
-            this.turn++;
-        }
+    const turnManager = {
+      act: () => {
+        this.turn++;
+      },
     };
     this.scheduler.add(turnManager, true);
-        this.scheduler.add(this.player, true);
+    this.scheduler.add(this.player, true);
     this.renderer.drawAll();
     this.renderer.startAnimationLoop();
     this.engine.start();
   }
   async _loadHelpContent() {
     try {
-      const response = await fetch('README.md');
+      const response = await fetch("README.md");
       const text = await response.text();
-      const lines = text.split('\n');
-      const helpStartIndex = lines.findIndex(line => line.trim() === '## Help');
+      const lines = text.split("\n");
+      const helpStartIndex = lines.findIndex(
+        (line) => line.trim() === "## Help",
+      );
       if (helpStartIndex !== -1) {
         const rawLines = lines.slice(helpStartIndex + 1);
         const wrappedLines = [];
         const maxWidth = 76; // DISPLAY_WIDTH is 80, leave some margin
 
-        rawLines.forEach(line => {
-            // Don't wrap titles or blank lines
-            if (line.trim().startsWith('#') || line.trim() === '') {
-                 wrappedLines.push(line);
-                 return;
-            }
+        rawLines.forEach((line) => {
+          // Don't wrap titles or blank lines
+          if (line.trim().startsWith("#") || line.trim() === "") {
+            wrappedLines.push(line);
+            return;
+          }
 
-            // Simple word wrapping for paragraphs
-            const words = line.split(' ');
-            let currentLine = '';
-            for (const word of words) {
-                if ((currentLine + ' ' + word).trim().length > maxWidth) {
-                    wrappedLines.push(currentLine);
-                    currentLine = word;
-                } else {
-                    if (currentLine === '') {
-                        currentLine = word;
-                    } else {
-                        currentLine += ' ' + word;
-                    }
-                }
+          // Simple word wrapping for paragraphs
+          const words = line.split(" ");
+          let currentLine = "";
+          for (const word of words) {
+            if ((currentLine + " " + word).trim().length > maxWidth) {
+              wrappedLines.push(currentLine);
+              currentLine = word;
+            } else {
+              if (currentLine === "") {
+                currentLine = word;
+              } else {
+                currentLine += " " + word;
+              }
             }
-            wrappedLines.push(currentLine);
+          }
+          wrappedLines.push(currentLine);
         });
         this.helpContent = wrappedLines;
       }
@@ -102,11 +106,20 @@ const turnManager = {
     this.renderer.drawAll(); // Redraw the screen with the correct view
   }
   isTileOccupied(x, y, actorToIgnore = null) {
-    if (this.player.x === x && this.player.y === y && this.player !== actorToIgnore) return true;
+    if (
+      this.player.x === x &&
+      this.player.y === y &&
+      this.player !== actorToIgnore
+    )
+      return true;
 
     for (const enemy of this.enemies) {
       if (enemy === actorToIgnore) continue;
       if (enemy.x === x && enemy.y === y) return true;
+    }
+    for (const npc of this.npcs) {
+      if (npc === actorToIgnore) continue;
+      if (npc.x === x && npc.y === y) return true;
     }
 
     return false;
