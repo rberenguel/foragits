@@ -118,26 +118,23 @@ export class Renderer {
     this.display.drawText(2, 1, "%c{#fff}%b{#333}--- HELP ---");
 
     let y = 3;
-    // Key Bindings
-    this.display.drawText(2, y++, "Arrow Keys - Move");
-    this.display.drawText(2, y++, "a - Toggle Aim Mode");
-    this.display.drawText(2, y++, "f - Fire (while aiming)");
-    this.display.drawText(2, y++, "r - Reload Weapon");
-    this.display.drawText(2, y++, "g - Get items on ground");
-    this.display.drawText(2, y++, "u - Use item (near fire pit)");
-    this.display.drawText(2, y++, "i - Open/Close Inventory");
-    this.display.drawText(2, y++, "? - Open/Close Help");
+    this.game.helpContent.forEach(line => {
+        let cleanLine = line.replace(/`/g, ''); // remove backticks
 
-    y += 2;
-    this.display.drawText(2, y++, "%c{#fff}%b{#333}--- BANDIT BEHAVIOR ---");
-    this.display.drawText(2, y++, "Bandits will hunt you if you enter their");
-    this.display.drawText(2, y++, "line of sight. They will remember your");
-    this.display.drawText(2, y++, "last known position.");
-    y++;
-    this.display.drawText(2, y++, "If they cannot see you, they will travel");
-    this.display.drawText(2, y++, "back to their home settlement.");
-    this.display.drawText(2, (y += 2), "-------------");
-    this.display.drawText(2, (y += 2), "More features soon!");
+        if (cleanLine.trim().startsWith('### ')) {
+            // It's a level 3 title
+            cleanLine = cleanLine.replace('###', '').trim().toUpperCase();
+            // Style it: yellow text with decoration
+            this.display.drawText(2, y++, `%c{#ff0}--- ${cleanLine} ---`);
+        } else if (cleanLine.trim().startsWith('#### ')) {
+            // It's a level 4 title
+            cleanLine = cleanLine.replace('####', '').trim();
+            // Style it: slightly indented, white text
+            this.display.drawText(4, y++, `%c{#fff}${cleanLine}`);
+        } else {
+            this.display.drawText(2, y++, cleanLine);
+        }
+    });
 
     const closeText = "([?] or [esc] to close)";
     this.display.drawText(

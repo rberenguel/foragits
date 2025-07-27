@@ -15,9 +15,11 @@ class Game {
     this.engine = new ROT.Engine(this.scheduler);
     this.gameState = "playing";
     this.turn = 0 // Confirm ROT does not have this built-in
+    this.helpContent = [];
   }
 
-  init() {
+  async init() {
+    await this._loadHelpContent();
     document
       .getElementById("help-button")
       .addEventListener("click", () => this.toggleHelp());
@@ -32,6 +34,48 @@ const turnManager = {
     this.renderer.drawAll();
     this.renderer.startAnimationLoop();
     this.engine.start();
+  }
+  async _loadHelpContent() {
+    try {
+      const response = await fetch('README.md');
+      const text = await response.text();
+      const lines = text.split('\n');
+      const helpStartIndex = lines.findIndex(line => line.trim() === '## Help');
+      if (helpStartIndex !== -1) {
+        const rawLines = lines.slice(helpStartIndex + 1);
+        const wrappedLines = [];
+        const maxWidth = 76; // DISPLAY_WIDTH is 80, leave some margin
+
+        rawLines.forEach(line => {
+            // Don't wrap titles or blank lines
+            if (line.trim().startsWith('#') || line.trim() === '') {
+                 wrappedLines.push(line);
+                 return;
+            }
+
+            // Simple word wrapping for paragraphs
+            const words = line.split(' ');
+            let currentLine = '';
+            for (const word of words) {
+                if ((currentLine + ' ' + word).trim().length > maxWidth) {
+                    wrappedLines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    if (currentLine === '') {
+                        currentLine = word;
+                    } else {
+                        currentLine += ' ' + word;
+                    }
+                }
+            }
+            wrappedLines.push(currentLine);
+        });
+        this.helpContent = wrappedLines;
+      }
+    } catch (error) {
+      console.error("Failed to load help content from README.md:", error);
+      this.helpContent = ["Error loading help."];
+    }
   }
   toggleMap() {
     if (this.gameState !== "map") {
