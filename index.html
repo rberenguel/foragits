@@ -46,18 +46,24 @@
         pointer-events: none;
         display: none;
       }
+      #message-log {
+        color: #ffc107; /* Amber color */
+        height: 1.5em; /* Reserve space */
+        font-size: 1.1em;
+        text-align: center;
+      }
     </style>
   </head>
   <body>
     <h1>Foragits</h1>
     <div id="game-ui"></div>
+    <div id="message-log"></div>
     <div id="flash-overlay"></div>
     <div id="game-container">
-      <!-- Add the new background canvas -->
       <canvas id="background-canvas"></canvas>
       <canvas id="particle-canvas"></canvas>
     </div>
     <script src="./rot-2.2.1.js"></script>
-    <script src="game.js"></script>
+    <script type="module" src="src/main.js"></script>
   </body>
 </html>
