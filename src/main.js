@@ -57,10 +57,11 @@ const turnManager = {
     }
     this.renderer.drawAll(); // Redraw the screen with the correct view
   }
-  isTileOccupied(x, y) {
-    if (this.player.x === x && this.player.y === y) return true;
+  isTileOccupied(x, y, actorToIgnore = null) {
+    if (this.player.x === x && this.player.y === y && this.player !== actorToIgnore) return true;
 
     for (const enemy of this.enemies) {
+      if (enemy === actorToIgnore) continue;
       if (enemy.x === x && enemy.y === y) return true;
     }
 

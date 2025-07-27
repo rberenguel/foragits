@@ -121,10 +121,13 @@ export class Bandit {
 
     // --- ASSIGN NAME ON CREATION ---
     this.name = generateBanditName();
-this.inventory = [
+    this.inventory = [
         createItem('revolver_rusty'),
         createItem('ammo_bullet', { quantity: Math.floor(Math.random() * 6) + 1 })
     ];
+    if (Math.random() < 0.15) {
+        this.inventory.push(createItem('can_of_beans'));
+    }
     const lightPasses = (x, y) => {
       const tileChar = this.game.world.getTileAt(x, y);
       return terrainInfo[tileChar]?.isTransparent ?? false;
@@ -169,15 +172,7 @@ getEquippedWeapon() {
 
       // If not shooting, move towards the target
       this.isAiming = false;
-      const passableCallback = (x, y) => terrainInfo[this.game.world.getTileAt(x, y)]?.isPassable ?? false;
-      const astar = new ROT.Path.AStar(target.x, target.y, passableCallback);
-      const path = [];
-      astar.compute(this.x, this.y, (x, y) => path.push({ x, y }));
-
-      if (path.length > 1) {
-        this.x = path[1].x;
-        this.y = path[1].y;
-      }
+      this._moveAlongPathTo(target);
 
       if (this.x === target.x && this.y === target.y) {
         this.lastKnownPlayerPosition = null;
@@ -188,20 +183,42 @@ getEquippedWeapon() {
     }
   }
 
+  _moveAlongPathTo(target) {
+    const passableCallback = (x, y) => {
+        const tile = this.game.world.getTileAt(x, y);
+        if (!terrainInfo[tile]?.isPassable) return false;
+        
+        // The target tile (e.g., player's position) should be considered passable for pathfinding.
+        if (x === target.x && y === target.y) return true;
+
+        // Don't path through other actors.
+        return !this.game.isTileOccupied(x, y, this);
+    };
+    const astar = new ROT.Path.AStar(target.x, target.y, passableCallback, {topology: 8});
+    const path = [];
+    astar.compute(this.x, this.y, (x, y) => path.push({ x, y }));
+
+    if (path.length > 1) {
+        const nextStep = path[1];
+        // Final check before moving to prevent collisions if actors move simultaneously.
+        if (!this.game.isTileOccupied(nextStep.x, nextStep.y, this)) {
+            this.x = nextStep.x;
+            this.y = nextStep.y;
+        }
+    }
+  }
+
   _pathfindToGoal() {
     const target = this.baseSettlement;
 
     if (target) {
-      // Pathfind towards the assigned base settlement
-      const passableCallback = (x, y) =>
-        terrainInfo[this.game.world.getTileAt(x, y)]?.isPassable ?? false;
-      const astar = new ROT.Path.AStar(target.x, target.y, passableCallback);
-      const path = [];
-      astar.compute(this.x, this.y, (x, y) => path.push({ x, y }));
-      if (path.length > 1) {
-        this.x = path[1].x;
-        this.y = path[1].y;
+      const distance = Math.hypot(this.x - target.x, this.y - target.y);
+      if (distance > 200) {
+          this._wanderRandomly();
+          return;
       }
+      // Pathfind towards the assigned base settlement
+      this._moveAlongPathTo(target);
     } else {
       // No base settlement, so wander randomly
       this._wanderRandomly();
@@ -210,10 +227,8 @@ getEquippedWeapon() {
 
   _wanderRandomly() {
     const moves = [
-      [-1, 0],
-      [1, 0],
-      [0, -1],
-      [0, 1],
+      [-1, 0], [1, 0], [0, -1], [0, 1],
+      [-1, -1], [-1, 1], [1, -1], [1, 1]
     ];
     const validMoves = [];
 
@@ -221,7 +236,7 @@ getEquippedWeapon() {
       const newX = this.x + move[0];
       const newY = this.y + move[1];
       const tile = this.game.world.getTileAt(newX, newY);
-      if (terrainInfo[tile]?.isPassable) {
+      if (terrainInfo[tile]?.isPassable && !this.game.isTileOccupied(newX, newY, this)) {
         validMoves.push(move);
       }
     }

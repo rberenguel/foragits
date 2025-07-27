@@ -32,6 +32,7 @@ export class Player {
     this.inventory = [
       createItem("revolver_rusty", { equipped: true }),
       createItem("ammo_bullet", { quantity: 18 }),
+      createItem("can_of_beans", { quantity: 2 }),
       createItem("belt_rusty", { equipped: true }),
       createItem("hat_fedora", { equipped: true }),
       createItem("boots_worn", { equipped: true }),
@@ -120,6 +121,9 @@ export class Player {
       if (code === ROT.KEYS.VK_I) this.game.toggleInventory();
       if (code === ROT.KEYS.VK_M) this.game.toggleMap();
       return;
+    }
+    if (key === "u") {
+      tookTurn = this._useItem();
     }
 
     if (this.isAiming) {
@@ -332,5 +336,64 @@ export class Player {
     this.game.renderer.drawAll();
     this.game.renderer.updateUI();
     return true; // A successful shot takes a turn
+  }
+  _useItem() {
+    // 1. Find adjacent fire pit
+    let firePitCoords = null;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const tileX = this.x + dx;
+        const tileY = this.y + dy;
+        const tile = this.game.world.getTileAt(tileX, tileY);
+        if (tile === TILE_TYPE.FIRE_PIT_INACTIVE) {
+          firePitCoords = { x: tileX, y: tileY };
+          break;
+        }
+      }
+      if (firePitCoords) break;
+    }
+
+    if (!firePitCoords) {
+      this.game.renderer.displayMessage("You are not near a fire pit.");
+      return false; // No turn taken
+    }
+
+    // 2. Find beans in inventory
+    const beanIndex = this.inventory.findIndex(
+      (i) => i.templateId === "can_of_beans",
+    );
+    const beans = this.inventory[beanIndex];
+
+    if (!beans) {
+      this.game.renderer.displayMessage(
+        "You have nothing to cook on the fire.",
+      );
+      return false;
+    }
+
+    // NEW: Check if player is already at full health
+    if (this.hp >= 10) {
+      this.game.renderer.displayMessage("You are already at full health.");
+      return false; // No turn taken
+    }
+
+    // 3. Use the item
+    this.hp = Math.min(10, this.hp + beans.heals); // Assuming max HP is 10
+
+    // 4. Decrement or remove item
+    if (beans.quantity > 1) {
+      beans.quantity--;
+    } else {
+      this.inventory.splice(beanIndex, 1);
+    }
+
+    // 5. Give feedback
+    this.game.renderer.displayMessage(
+      "You warm a can of beans by the fire. You feel better.",
+    );
+    this.game.renderer.updateUI();
+
+    return true; // Turn taken
   }
 }

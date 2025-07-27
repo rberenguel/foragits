@@ -38,6 +38,12 @@ export const terrainInfo = {
     isBulletPassable: true,
     color: "#8B4513",
   },
+  "~": {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    color: "#706f6f",
+  },
 };
 
 export const TILE_TYPE = {
@@ -47,4 +53,5 @@ export const TILE_TYPE = {
   SETTLEMENT_WALL: "=",
   DOOR: "+",
   PLACARD: "팻",
+  FIRE_PIT_INACTIVE: "~",
 };

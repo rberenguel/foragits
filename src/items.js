@@ -39,6 +39,16 @@ const itemTemplates = {
     color: "#543d2b",
     type: "apparel",
   },
+  // Consumables
+  can_of_beans: {
+    name: "Can of Beans",
+    char: "o",
+    color: "#bfae8e",
+    type: "consumable",
+    isStackable: true,
+    heals: 4, // Restores 4 HP
+    quantity: 1,
+  },
 };
 
 /**
@@ -52,5 +62,5 @@ export function createItem(templateId, overrides = {}) {
     throw new Error(`Item template with id "${templateId}" not found.`);
   }
   const template = itemTemplates[templateId];
-  return { ...template, ...overrides };
+  return { templateId, ...template, ...overrides };
 }

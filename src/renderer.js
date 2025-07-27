@@ -102,6 +102,7 @@ export class Renderer {
     this.display.drawText(2, y++, "f - Fire (while aiming)");
     this.display.drawText(2, y++, "r - Reload Weapon");
     this.display.drawText(2, y++, "g - Get items on ground");
+    this.display.drawText(2, y++, "u - Use item (near fire pit)");
     this.display.drawText(2, y++, "i - Open/Close Inventory");
     this.display.drawText(2, y++, "? - Open/Close Help");
 
@@ -407,7 +408,10 @@ export class Renderer {
         let color = "#555";
 
         // --- UPDATED LOGIC TO HIGHLIGHT SETTLEMENTS ---
-        if (this.game.world.isSettlementTile(worldX, worldY)) {
+        if (tileChar === TILE_TYPE.FIRE_PIT_INACTIVE) {
+          char = "~";
+          color = "#ff6600"; // Orange for fire pit
+        } else if (this.game.world.isSettlementTile(worldX, worldY)) {
           color = "#a39a78"; // Tan color for settlement areas
           char = !info.isPassable ? "#" : "░";
         } else if (!info.isPassable) {

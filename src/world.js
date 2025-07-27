@@ -125,7 +125,9 @@ export class World {
         ? TILE_TYPE.WALL
         : ROT.RNG.getUniform() < 0.02
           ? TILE_TYPE.CACTUS
-          : TILE_TYPE.FLOOR;
+          : ROT.RNG.getUniform() < 0.0005
+            ? TILE_TYPE.FIRE_PIT_INACTIVE
+            : TILE_TYPE.FLOOR;
     });
 
     const settlement = this._getSettlementForChunk(chunkX, chunkY);
