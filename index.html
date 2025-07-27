@@ -52,12 +52,29 @@
         font-size: 1.1em;
         text-align: center;
       }
+      #help-button {
+        position: fixed;
+        top: 15px;
+        right: 20px;
+        font-size: 1.5em;
+        font-family: monospace;
+        cursor: pointer;
+        z-index: 200;
+        color: #eee;
+        border: 2px solid #eee;
+        border-radius: 50%;
+        width: 1.5em;
+        height: 1.5em;
+        text-align: center;
+        line-height: 1.5em;
+      }
     </style>
   </head>
   <body>
     <h1>Foragits</h1>
     <div id="game-ui"></div>
     <div id="message-log"></div>
+    <div id="help-button">?</div>
     <div id="flash-overlay"></div>
     <div id="game-container">
       <canvas id="background-canvas"></canvas>

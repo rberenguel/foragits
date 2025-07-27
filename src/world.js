@@ -1,4 +1,4 @@
-import { CHUNK_WIDTH, CHUNK_HEIGHT } from "./constants.js";
+import { CHUNK_WIDTH, CHUNK_HEIGHT, SETTLEMENT_RADIUS } from "./constants.js";
 import { Settlement } from "./features/settlement.js";
 import { TILE_TYPE } from "./terrain.js";
 
@@ -6,13 +6,26 @@ const META_CHUNK_SIZE = 10; // A settlement can appear in a 10x10 chunk area
 const SETTLEMENT_CHANCE = 0.4; // 40% chance of a settlement in a meta-chunk
 
 export class World {
-  constructor() {
+  constructor(game) {
+    this.game = game;
     this.chunks = {};
     this.effects = {};
     this.settlements = new Map();
     this.placardMap = new Map();
+    this.itemsOnGround = new Map();
   }
-
+  isSettlementTile(x, y) {
+    const metaX = Math.floor(x / (CHUNK_WIDTH * META_CHUNK_SIZE));
+    const metaY = Math.floor(y / (CHUNK_HEIGHT * META_CHUNK_SIZE));
+    const settlement = this.settlements.get(`${metaX},${metaY}`);
+    if (
+      settlement &&
+      Math.hypot(x - settlement.x, y - settlement.y) < SETTLEMENT_RADIUS
+    ) {
+      return true;
+    }
+    return false;
+  }
   findNearestSettlement(x, y) {
     const allSettlements = Array.from(this.settlements.values()).filter(
       (s) => s !== null,
@@ -77,27 +90,7 @@ export class World {
     const centerX = worldX + Math.floor(ROT.RNG.getUniform() * size);
     const centerY = worldY + Math.floor(ROT.RNG.getUniform() * size);
 
-    const buildings = [];
-    const numBuildings = ROT.RNG.getUniformInt(2, 3);
-    for (let i = 0; i < numBuildings; i++) {
-      buildings.push({
-        x: centerX + ROT.RNG.getUniformInt(-15, 15),
-        y: centerY + ROT.RNG.getUniformInt(-15, 15),
-        width: ROT.RNG.getUniformInt(5, 9),
-        height: ROT.RNG.getUniformInt(5, 9),
-      });
-    }
-
-    // --- ADDED THIS LINE FOR DEBUGGING ---
-    console.log(
-      `Settlement generated at world coordinates near: x=${centerX}, y=${centerY}`,
-    );
-
-    const settlement = new Settlement(centerX, centerY, this);
-    this.placardMap.set(
-      `${settlement.placard.x},${settlement.placard.y}`,
-      settlement,
-    );
+    const settlement = new Settlement(centerX, centerY);
     this.settlements.set(metaKey, settlement);
     return settlement;
   }
@@ -137,23 +130,77 @@ export class World {
 
     const settlement = this._getSettlementForChunk(chunkX, chunkY);
     if (settlement) {
-      const SETTLEMENT_RADIUS = 25;
-      const localTilesToOverwrite = {};
+      // --- REVISED PLACARD AND SETTLEMENT LOGIC ---
 
-      // 2. Clear ground, define walls and doors
+      // 1. Determine placard location ONCE for the whole settlement
+      if (settlement.placard.x === 0 && settlement.placard.y === 0) {
+        const possiblePlacardLocations = [];
+        const radius = 20;
+        for (let y = settlement.y - radius; y <= settlement.y + radius; y++) {
+          for (let x = settlement.x - radius; x <= settlement.x + radius; x++) {
+            if (Math.hypot(x - settlement.x, y - settlement.y) > radius)
+              continue;
+
+            let isWallOrDoor = false;
+            for (const b of settlement.buildings) {
+              if (x === b.door.x && y === b.door.y) {
+                isWallOrDoor = true;
+                break;
+              }
+              const isTopOrBottom =
+                (y === b.y || y === b.y + b.height - 1) &&
+                x >= b.x &&
+                x < b.x + b.width;
+              const isLeftOrRight =
+                (x === b.x || x === b.x + b.width - 1) &&
+                y >= b.y &&
+                y < b.y + b.height;
+              if (isTopOrBottom || isLeftOrRight) {
+                isWallOrDoor = true;
+                break;
+              }
+            }
+            if (!isWallOrDoor) {
+              possiblePlacardLocations.push({ x, y });
+            }
+          }
+        }
+        if (possiblePlacardLocations.length > 0) {
+          const loc =
+            possiblePlacardLocations[
+              ROT.RNG.getUniformInt(0, possiblePlacardLocations.length - 1)
+            ];
+          settlement.placard = { x: loc.x, y: loc.y };
+          this.placardMap.set(`${loc.x},${loc.y}`, settlement);
+        }
+      }
+
+      // 2. Draw this chunk based on the complete settlement layout
+      const SETTLEMENT_RADIUS = 25;
       for (let y = 0; y < CHUNK_HEIGHT; y++) {
         for (let x = 0; x < CHUNK_WIDTH; x++) {
           const worldX = chunkX * CHUNK_WIDTH + x;
           const worldY = chunkY * CHUNK_HEIGHT + y;
 
+          // Check if an actor is here before overwriting the tile
+          if (this.game.isTileOccupied(worldX, worldY)) continue;
+
+          if (
+            worldX === settlement.placard.x &&
+            worldY === settlement.placard.y
+          ) {
+            this.chunks[key][`${x},${y}`] = TILE_TYPE.PLACARD;
+            continue;
+          }
+
           if (
             Math.hypot(worldX - settlement.x, worldY - settlement.y) <
             SETTLEMENT_RADIUS
           ) {
-            let tileType = "."; // Default to cleared ground
+            let tileType = TILE_TYPE.FLOOR;
             for (const b of settlement.buildings) {
               if (worldX === b.door.x && worldY === b.door.y) {
-                tileType = "+";
+                tileType = TILE_TYPE.DOOR;
                 break;
               }
               const isTopOrBottom =
@@ -165,46 +212,14 @@ export class World {
                 worldY >= b.y &&
                 worldY < b.y + b.height;
               if (isTopOrBottom || isLeftOrRight) {
-                tileType = "=";
+                tileType = TILE_TYPE.SETTLEMENT_WALL;
                 break;
               }
             }
-            if (tileType !== this.chunks[key][`${x},${y}`]) {
-              localTilesToOverwrite[`${x},${y}`] = tileType;
-            }
+            this.chunks[key][`${x},${y}`] = tileType;
           }
         }
       }
-
-      // 3. Place placard in a guaranteed open spot
-      if (!this.placardMap.has(`${settlement.x},${settlement.y}`)) {
-        // Quick check to only do this once
-        let placardPlaced = false;
-        for (let i = 0; i < 30; i++) {
-          // Try 30 times
-          const placX = settlement.x + ROT.RNG.getUniformInt(-12, 12);
-          const placY = settlement.y + ROT.RNG.getUniformInt(-12, 12);
-          if (this.getTileAt(placX, placY) === ".") {
-            const placChunkX = Math.floor(placX / CHUNK_WIDTH);
-            if (placChunkX === chunkX) {
-              // Only write if it's in *this* chunk
-              const localX =
-                ((placX % CHUNK_WIDTH) + CHUNK_WIDTH) % CHUNK_WIDTH;
-              const localY =
-                ((placY % CHUNK_HEIGHT) + CHUNK_HEIGHT) % CHUNK_HEIGHT;
-              localTilesToOverwrite[`${localX},${localY}`] = "팻";
-            }
-            settlement.placard = { x: placX, y: placY };
-            this.placardMap.set(`${placX},${placY}`, settlement);
-            this.placardMap.set(`${settlement.x},${settlement.y}`, true); // Mark as placed
-            placardPlaced = true;
-            break;
-          }
-        }
-      }
-
-      // 4. Apply all changes to the chunk
-      Object.assign(this.chunks[key], localTilesToOverwrite);
     }
   }
 }

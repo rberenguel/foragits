@@ -1,5 +1,5 @@
 import { terrainInfo } from "../terrain.js";
-
+import { createItem } from '../items.js';
 // --- NEW: BANDIT NAME GENERATOR ---
 const firstNames = [
   "Jed",
@@ -121,18 +121,23 @@ export class Bandit {
 
     // --- ASSIGN NAME ON CREATION ---
     this.name = generateBanditName();
-
+this.inventory = [
+        createItem('revolver_rusty'),
+        createItem('ammo_bullet', { quantity: Math.floor(Math.random() * 6) + 1 })
+    ];
     const lightPasses = (x, y) => {
       const tileChar = this.game.world.getTileAt(x, y);
       return terrainInfo[tileChar]?.isTransparent ?? false;
     };
     this.fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
   }
-
+getEquippedWeapon() {
+      return this.inventory.find(i => i.type === 'weapon');
+  }
   act() {
-    if (this.game.player.hp <= 0) return; // Player is dead, do nothing.
+    if (this.game.player.hp <= 0) return;
 
-    // 1. PERCEPTION: Can I see the player right now?
+    // 1. PERCEPTION
     let playerIsVisible = false;
     this.fov.compute(this.x, this.y, 8, (x, y, r, visibility) => {
       if (x === this.game.player.x && y === this.game.player.y) {
@@ -141,31 +146,30 @@ export class Bandit {
     });
 
     if (playerIsVisible) {
-      this.lastKnownPlayerPosition = {
-        x: this.game.player.x,
-        y: this.game.player.y,
-      };
+      this.lastKnownPlayerPosition = { x: this.game.player.x, y: this.game.player.y };
     }
 
     // 2. DECISION MAKING
     const target = this.lastKnownPlayerPosition;
-
-    // A. If I have a target (current or previous)
+    
     if (target) {
       const distance = Math.hypot(this.x - target.x, this.y - target.y);
+      const weapon = this.getEquippedWeapon();
 
-      // A.1: Try to shoot if the player is currently visible and close enough
-      if (playerIsVisible && distance <= 12) {
-        this.isAiming = true; // For now, just aim. Next turn, we can shoot.
-        return; // Aiming is a full turn action
+      // UPDATED: Check for ammo before deciding to shoot
+      if (playerIsVisible && distance <= 12 && weapon && weapon.loaded > 0) {
+        if (this.isAiming) {
+          this.isAiming = false;
+          this.game.attack(this, this.game.player);
+        } else {
+          this.isAiming = true;
+        }
+        return;
       }
 
-      // A.2: If not shooting, move towards the target
-      this.isAiming = false; // Can't aim and move
-      const passableCallback = (x, y) => {
-        const tile = this.game.world.getTileAt(x, y);
-        return terrainInfo[tile]?.isPassable ?? false;
-      };
+      // If not shooting, move towards the target
+      this.isAiming = false;
+      const passableCallback = (x, y) => terrainInfo[this.game.world.getTileAt(x, y)]?.isPassable ?? false;
       const astar = new ROT.Path.AStar(target.x, target.y, passableCallback);
       const path = [];
       astar.compute(this.x, this.y, (x, y) => path.push({ x, y }));
@@ -175,13 +179,10 @@ export class Bandit {
         this.y = path[1].y;
       }
 
-      // If I've reached my target destination, forget about it.
       if (this.x === target.x && this.y === target.y) {
         this.lastKnownPlayerPosition = null;
       }
-    }
-    // B. If I have no target, just wander
-    else {
+    } else {
       this.isAiming = false;
       this._pathfindToGoal();
     }
@@ -207,7 +208,7 @@ export class Bandit {
     }
   }
 
-  _wander() {
+  _wanderRandomly() {
     const moves = [
       [-1, 0],
       [1, 0],
