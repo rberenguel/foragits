@@ -121,13 +121,20 @@ export class World {
     for (let i = 0; i < 4; i++) cellular.create();
 
     cellular.create((x, y, value) => {
-      this.chunks[key][`${x},${y}`] = value
-        ? TILE_TYPE.WALL
-        : ROT.RNG.getUniform() < 0.02
-          ? TILE_TYPE.CACTUS
-          : ROT.RNG.getUniform() < 0.0005
-            ? TILE_TYPE.FIRE_PIT_INACTIVE
-            : TILE_TYPE.FLOOR;
+      const tileRoll = ROT.RNG.getUniform();
+      let tile = TILE_TYPE.FLOOR;
+      if (value) {
+        tile = TILE_TYPE.WALL;
+      } else if (tileRoll < 0.02) {
+        tile = TILE_TYPE.CACTUS;
+      } else if (tileRoll < 0.025) {
+        // Rocks are slightly more common than cacti
+        tile = TILE_TYPE.ROCK;
+      } else if (tileRoll < 0.0255) {
+        // Fire pits are very rare
+        tile = TILE_TYPE.FIRE_PIT_INACTIVE;
+      }
+      this.chunks[key][`${x},${y}`] = tile;
     });
 
     const settlement = this._getSettlementForChunk(chunkX, chunkY);

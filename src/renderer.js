@@ -49,8 +49,30 @@ export class Renderer {
     this.visibleTiles = new Set();
     this.exploredTiles = new Set();
     const lightPasses = (x, y) => {
+      const player = this.game.player;
       const tile = this.game.world.getTileAt(x, y);
-      return tile !== "#" && tile !== "=";
+      const info = terrainInfo[tile];
+
+      if (player.isDucking) {
+        const dx = Math.abs(x - player.x);
+        const dy = Math.abs(y - player.y);
+        // Check if the tile is adjacent to the player
+        if (dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0)) {
+          const coverTypes = [
+            TILE_TYPE.ROCK,
+            TILE_TYPE.WALL,
+            TILE_TYPE.SETTLEMENT_WALL,
+            TILE_TYPE.CACTUS,
+          ];
+          // If it's a cover tile, it blocks vision while ducking
+          if (coverTypes.includes(tile)) {
+            return false;
+          }
+        }
+      }
+
+      // Otherwise, rely on the tile's natural transparency.
+      return info?.isTransparent ?? false;
     };
     this.fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
   }
@@ -361,7 +383,8 @@ export class Renderer {
     }
 
     enemies.forEach((enemy) => {
-      if (enemy.isAiming && !enemy.isCorpse()) {
+      const isVisible = this.visibleTiles.has(`${enemy.x},${enemy.y}`);
+      if (enemy.isAiming && !enemy.isCorpse() && isVisible) {
         this._drawAimLineOnCanvas(enemy, player, "rgba(255, 0, 0, 0.3)", []);
       }
     });
@@ -582,6 +605,7 @@ export class Renderer {
     const ammoText = weapon ? `${weapon.loaded}/${weapon.capacity}` : "N/A";
     const ui = document.getElementById("game-ui");
     const aimingText = player.isAiming ? " [AIMING]" : "";
-    ui.textContent = `HP: ${player.hp}/10 | Ammo: ${ammoText}${aimingText}`;
+    const duckingText = player.isDucking ? " [DUCKING]" : "";
+    ui.textContent = `HP: ${player.hp}/10 | Ammo: ${ammoText}${aimingText}${duckingText}`;
   }
 }

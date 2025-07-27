@@ -27,6 +27,7 @@ export class Player {
     this.ammo = 6;
     this.isAiming = false;
     this.aimAngle = 0;
+    this.isDucking = false;
 
     this.money = 2;
     this.inventory = [
@@ -124,6 +125,9 @@ export class Player {
     }
     if (key === "u") {
       tookTurn = this._useItem();
+    }
+    if (key === "d") {
+      tookTurn = this._toggleDuck();
     }
 
     if (this.isAiming) {
@@ -237,6 +241,7 @@ export class Player {
 
     this.x = newX;
     this.y = newY;
+    this.isDucking = false; // Moving cancels ducking
     const corpse = this.game.enemies.find(
       (e) => e.x === this.x && e.y === this.y && e.isCorpse(),
     );
@@ -296,6 +301,12 @@ export class Player {
 
     weapon.loaded--; // Consume one round
 
+    const wasDucking = this.isDucking;
+    if (wasDucking) {
+      this.isDucking = false;
+      this.game.renderer.drawAll(); // Redraw to get the "glimpse"
+    }
+
     const rad = this.aimAngle * (Math.PI / 180);
     const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
     const line = this.game.getLine(
@@ -333,9 +344,56 @@ export class Player {
     }
 
     this.isAiming = false;
-    this.game.renderer.drawAll();
+
+    if (wasDucking) {
+      setTimeout(() => {
+        this.isDucking = true;
+        this.game.renderer.drawAll();
+        this.game.renderer.updateUI();
+      }, 100); // 100ms delay for the glimpse
+    } else {
+      // If not ducking, just redraw normally to remove aim line etc.
+      this.game.renderer.drawAll();
+    }
+
     this.game.renderer.updateUI();
     return true; // A successful shot takes a turn
+  }
+  _toggleDuck() {
+    if (this.isDucking) {
+      this.isDucking = false;
+      this.game.renderer.displayMessage("You pop up from behind cover.");
+      this.game.renderer.drawAll();
+      return true; // Takes a turn to stand up
+    }
+
+    // Check for adjacent cover
+    let hasCover = false;
+    const coverTypes = [TILE_TYPE.ROCK];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const tileX = this.x + dx;
+        const tileY = this.y + dy;
+        const tile = this.game.world.getTileAt(tileX, tileY);
+        if (coverTypes.includes(tile)) {
+          hasCover = true;
+          break;
+        }
+      }
+      if (hasCover) break;
+    }
+
+    if (hasCover) {
+      this.isDucking = true;
+      this.isAiming = false; // Can't aim while fully ducked
+      this.game.renderer.displayMessage("You duck behind cover.");
+      this.game.renderer.drawAll();
+      return true; // Takes a turn
+    } else {
+      this.game.renderer.displayMessage("There is no cover here.");
+      return false; // No turn
+    }
   }
   _useItem() {
     // 1. Find adjacent fire pit

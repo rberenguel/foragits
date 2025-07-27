@@ -118,6 +118,7 @@ export class Bandit {
     this.isAiming = false;
     this.lastKnownPlayerPosition = null;
     this.baseSettlement = baseSettlement;
+    this.playerIsVisible = false;
 
     // --- ASSIGN NAME ON CREATION ---
     this.name = generateBanditName();
@@ -141,15 +142,23 @@ getEquippedWeapon() {
     if (this.game.player.hp <= 0) return;
 
     // 1. PERCEPTION
-    let playerIsVisible = false;
+    let isPlayerInLOS = false;
     this.fov.compute(this.x, this.y, 8, (x, y, r, visibility) => {
       if (x === this.game.player.x && y === this.game.player.y) {
-        playerIsVisible = true;
+        if (visibility > 0) {
+          isPlayerInLOS = true;
+        }
       }
     });
 
-    if (playerIsVisible) {
-      this.lastKnownPlayerPosition = { x: this.game.player.x, y: this.game.player.y };
+    // A ducking player is not visible, even if in line-of-sight.
+    this.playerIsVisible = isPlayerInLOS && !this.game.player.isDucking;
+
+    if (this.playerIsVisible) {
+      this.lastKnownPlayerPosition = {
+        x: this.game.player.x,
+        y: this.game.player.y,
+      };
     }
 
     // 2. DECISION MAKING
@@ -160,7 +169,7 @@ getEquippedWeapon() {
       const weapon = this.getEquippedWeapon();
 
       // UPDATED: Check for ammo before deciding to shoot
-      if (playerIsVisible && distance <= 12 && weapon && weapon.loaded > 0) {
+      if (this.playerIsVisible && distance <= 12 && weapon && weapon.loaded > 0) {
         if (this.isAiming) {
           this.isAiming = false;
           this.game.attack(this, this.game.player);

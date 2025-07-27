@@ -123,6 +123,11 @@ const turnManager = {
   attack(attacker, target, aimVector = null) {
     if (target instanceof Player) {
       // Bandit is attacking the player
+      if (target.isDucking) {
+        this.renderer.displayMessage("The bandit's shot hits your cover!");
+        // Maybe add a ricochet effect on the cover tile later
+        return;
+      }
       const weapon = attacker.getEquippedWeapon();
       if (weapon && weapon.loaded > 0) {
         weapon.loaded--;
