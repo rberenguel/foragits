@@ -1,0 +1,114 @@
+body {
+  background-color: #111;
+  color: #eee;
+  font-family: "Roboto Mono", monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#game-container {
+  position: relative;
+  border: 2px solid #555;
+}
+
+#background-canvas,
+#particle-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+canvas[style*="z-index: 2"] {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+}
+
+#game-ui-container {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  width: 1280px;
+  box-sizing: border-box;
+}
+
+#game-ui,
+#message-log {
+  background-color: #222;
+  padding: 5px 10px;
+  border-radius: 3px;
+  min-height: 1.2em;
+  min-width: 100px;
+}
+
+#flash-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 0, 0, 0.3);
+  display: none;
+  z-index: 100;
+}
+
+#help-screen {
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  width: 50%;
+  height: 80%;
+  background-color: rgba(30, 30, 30, 0.95);
+  color: #ccc;
+  z-index: 200;
+  border: 1px solid #888;
+  padding: 20px;
+  overflow-y: scroll;
+  box-sizing: border-box;
+  font-family: "Roboto Mono", monospace;
+}
+
+#help-screen::-webkit-scrollbar {
+  width: 8px;
+}
+
+#help-screen::-webkit-scrollbar-track {
+  background: #001f27; /* Solarized Base02 */
+  border-radius: 10px;
+}
+
+#help-screen::-webkit-scrollbar-thumb {
+  background: #073642; /* Solarized Base01 */
+  border-radius: 10px;
+}
+
+#help-screen::-webkit-scrollbar-thumb:hover {
+  background: #586e75; /* Solarized Base00 */
+}
+
+#help-screen h2 {
+  color: #ffc107;
+  border-bottom: 1px solid #555;
+  padding-bottom: 5px;
+}
+
+#help-screen h3 {
+  color: #fff;
+}
+
+#help-screen p {
+  line-height: 1.2;
+  margin-block-end: 0.5em;
+  margin-block-start: 0.5em;
+}
+
+#help-screen code {
+
+}
+
+.hidden {
+  display: none;
+}

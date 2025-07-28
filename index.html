@@ -1,122 +1,27 @@
-<head>
+<html>
+  <head>
     <meta charset="UTF-8" />
-    <title>Western Roguelike</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto+Mono" />
-    <style>
-        body {
-            background-color: #111;
-            color: #eee;
-            font-family: "Roboto Mono", monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
+    <title>Foragits</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Roboto+Mono"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
 
-        #game-container {
-            position: relative;
-            border: 2px solid #555;
-        }
-
-        #background-canvas,
-        #particle-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 1;
-        }
-
-        canvas[style*="z-index: 2"] {
-            position: absolute !important;
-            top: 0;
-            left: 0;
-        }
-
-        #game-ui-container {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            width: 1280px;
-            box-sizing: border-box;
-        }
-
-        #game-ui,
-        #message-log {
-            background-color: #222;
-            padding: 5px 10px;
-            border-radius: 3px;
-            min-height: 1.2em;
-            min-width: 100px;
-        }
-
-        #flash-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 0, 0, 0.3);
-            display: none;
-            z-index: 100;
-        }
-
-        #help-screen {
-            position: absolute;
-            top: 10%;
-            left: 10%;
-            width: 80%;
-            height: 80%;
-            background-color: rgba(30, 30, 30, 0.95);
-            color: #ccc;
-            z-index: 200;
-            border: 1px solid #888;
-            padding: 20px;
-            overflow-y: scroll;
-            box-sizing: border-box;
-            font-family: "Roboto Mono", monospace;
-        }
-
-        #help-screen h2 {
-            color: #ffc107;
-            border-bottom: 1px solid #555;
-            padding-bottom: 5px;
-        }
-
-        #help-screen h3 {
-            color: #fff;
-        }
-
-        #help-screen p {
-            line-height: 1.6;
-        }
-
-        #help-screen code {
-            background-color: #444;
-            padding: 2px 5px;
-            border-radius: 3px;
-        }
-
-        .hidden {
-            display: none;
-        }
-    </style>
-</head>
-
-<body>
-    <h1>Western Roguelike</h1>
+  <body>
     <div id="game-ui-container">
-        <div id="game-ui"></div>
-        <div id="message-log"></div>
-        <button id="help-button">Help (?)</button>
+      <div id="game-ui"></div>
+      <div id="message-log"></div>
+      <button id="help-button">Help (?)</button>
     </div>
     <div id="game-container">
-        <div id="help-screen" class="hidden"></div>
-        <div id="flash-overlay"></div>
-        <canvas id="background-canvas"></canvas>
-        <canvas id="particle-canvas"></canvas>
+      <div id="help-screen" class="hidden"></div>
+      <div id="flash-overlay"></div>
+      <canvas id="background-canvas"></canvas>
+      <canvas id="particle-canvas"></canvas>
     </div>
     <script src="rot-2.2.1.js"></script>
     <script type="module" src="src/main.js"></script>
-</body>
-
+  </body>
 </html>

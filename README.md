@@ -2,7 +2,7 @@
 
 A simple, turn-based roguelike prototype with a Western theme, built in JavaScript and `rot-js`.
 
-See `plan.md` for current features and next functionality.
+See `plan.md` and `next_steps.md` for current features and next functionality.
 
 ## Current Objective
 
@@ -39,7 +39,7 @@ Bandits will hunt you if you enter their line of sight. They will remember your 
 
 #### Settlements & Shopping
 
-You can find settlements populated by townsfolk (`P`). One building in each settlement is a shop, run by a Shopkeeper. You can talk (`t`) to a shopkeeper to open a trade menu and buy goods with the money (`) you've acquired.
+You can find settlements populated by townsfolk (`P`). One building in each settlement is a shop, run by a Shopkeeper. You can talk (`t`) to a shopkeeper to open a trade menu and buy goods with the money (`$`) you've acquired.
 
 #### Cover System
 

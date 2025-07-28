@@ -296,7 +296,12 @@ class Game {
       const tile = this.world.getTileAt(point.x, point.y);
       const info = terrainInfo[tile];
       if (info && !info.isBulletPassable) {
-        if (tile === "🌵") {
+        const cactusTypes = [
+          "Ψ", // TILE_TYPE.CACTUS,
+          "☨", // TILE_TYPE.CACTUS_2,
+          "‡", // TILE_TYPE.CACTUS_3,
+        ];
+        if (cactusTypes.includes(tile)) {
           this.renderer.createSplatterEffect(
             point.x,
             point.y,
