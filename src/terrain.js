@@ -1,64 +1,99 @@
 // src/terrain.js
 
+export const TILE_TYPE = {
+  FLOOR: ".",
+  WALL: "#",
+  CACTUS: "Ψ",
+  CACTUS_2: "☨",
+  CACTUS_3: "‡",
+  SHRUB: "*",
+  SHRUB_2: "⁂",
+  SHRUB_3: "%",
+  SETTLEMENT_WALL: "=",
+  DOOR: "+",
+  PLACARD: "팻",
+  FIRE_PIT_INACTIVE: "~",
+  ROCK: "o",
+};
+
 export const terrainInfo = {
-  ".": {
+  [TILE_TYPE.FLOOR]: {
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#D2B48C",
     darkColor: "#423e37",
   },
-  "#": {
+  [TILE_TYPE.WALL]: {
     isPassable: false,
     isTransparent: false,
     isBulletPassable: false,
     color: "#8B4513",
   },
-  Ψ: {
+  [TILE_TYPE.CACTUS]: {
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
     color: "#2E8B57",
   },
-  "=": {
+  [TILE_TYPE.CACTUS_2]: {
+    isPassable: false,
+    isTransparent: true,
+    isBulletPassable: false,
+    color: "#2E8B57",
+  },
+  [TILE_TYPE.CACTUS_3]: {
+    isPassable: false,
+    isTransparent: true,
+    isBulletPassable: false,
+    color: "#2E8B57",
+  },
+  [TILE_TYPE.SHRUB]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    color: "#556B2F",
+  },
+  [TILE_TYPE.SHRUB_2]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    color: "#6B8E23",
+  },
+  [TILE_TYPE.SHRUB_3]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    color: "#8FBC8F",
+  },
+  [TILE_TYPE.SETTLEMENT_WALL]: {
     isPassable: false,
     isTransparent: false,
     isBulletPassable: false,
     color: "#A9A9A9",
   },
-  "+": {
+  [TILE_TYPE.DOOR]: {
     isPassable: true,
     isTransparent: false, // Blocks line of sight
     isBulletPassable: true, // But not bullets
     color: "#A0522D",
   },
-  팻: {
+  [TILE_TYPE.PLACARD]: {
     isPassable: false,
     isTransparent: true,
     isBulletPassable: true,
     color: "#8B4513",
   },
-  "~": {
+  [TILE_TYPE.FIRE_PIT_INACTIVE]: {
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#706f6f",
   },
-  o: {
+  [TILE_TYPE.ROCK]: {
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#8d8d8d",
   },
-};
-
-export const TILE_TYPE = {
-  FLOOR: ".",
-  WALL: "#",
-  CACTUS: "Ψ",
-  SETTLEMENT_WALL: "=",
-  DOOR: "+",
-  PLACARD: "팻",
-  FIRE_PIT_INACTIVE: "~",
-  ROCK: "o",
 };

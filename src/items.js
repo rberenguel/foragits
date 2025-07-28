@@ -2,14 +2,47 @@
 
 const itemTemplates = {
   // Weapons
+  revolver: {
+    name: "Revolver",
+    char: "r",
+    color: "#c0c0c0",
+    type: "weapon",
+    damage: "1d6",
+    capacity: 6,
+    loaded: 6,
+    aimError: 5, // Degrees of deviation
+    misfireChance: 0.01, // 1% chance
+  },
   revolver_rusty: {
     name: "Rusty Revolver",
     char: "r",
     color: "#a35229",
     type: "weapon",
-    damage: "1d6",
+    damage: "1d4",
     capacity: 6,
     loaded: 6,
+    aimError: 15, // Degrees of deviation
+    misfireChance: 0.1, // 10% chance
+  },
+  shotgun: {
+    name: "Shotgun",
+    char: "S",
+    color: "#8b4513",
+    type: "weapon",
+    damage: "2d5", // Deals high damage at close range
+    capacity: 2,
+    loaded: 2,
+    aimError: 25, // Very inaccurate at range
+    misfireChance: 0.05,
+  },
+  // Misc
+  money: {
+    name: "Money",
+    char: "$",
+    color: "#ffd700", // Gold color
+    type: "money",
+    isStackable: true,
+    quantity: 1,
   },
   // Ammo
   ammo_bullet: {

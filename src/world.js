@@ -2,6 +2,7 @@ import { CHUNK_WIDTH, CHUNK_HEIGHT, SETTLEMENT_RADIUS } from "./constants.js";
 import { Settlement } from "./features/settlement.js";
 import { TILE_TYPE } from "./terrain.js";
 import { NPC } from "./actors/npc.js";
+import { Shopkeeper } from "./actors/shopkeeper.js";
 
 const META_CHUNK_SIZE = 10; // A settlement can appear in a 10x10 chunk area
 const SETTLEMENT_CHANCE = 0.4; // 40% chance of a settlement in a meta-chunk
@@ -127,13 +128,19 @@ export class World {
       if (value) {
         tile = TILE_TYPE.WALL;
       } else if (tileRoll < 0.02) {
-        tile = TILE_TYPE.CACTUS;
+        const cactusType = ROT.RNG.getUniformInt(1, 3);
+        if (cactusType === 1) tile = TILE_TYPE.CACTUS;
+        else if (cactusType === 2) tile = TILE_TYPE.CACTUS_2;
+        else tile = TILE_TYPE.CACTUS_3;
       } else if (tileRoll < 0.025) {
-        // Rocks are slightly more common than cacti
         tile = TILE_TYPE.ROCK;
       } else if (tileRoll < 0.0255) {
-        // Fire pits are very rare
         tile = TILE_TYPE.FIRE_PIT_INACTIVE;
+      } else if (tileRoll < 0.04) {
+        const shrubType = ROT.RNG.getUniformInt(1, 3);
+        if (shrubType === 1) tile = TILE_TYPE.SHRUB;
+        else if (shrubType === 2) tile = TILE_TYPE.SHRUB_2;
+        else tile = TILE_TYPE.SHRUB_3;
       }
       this.chunks[key][`${x},${y}`] = tile;
     });
@@ -236,17 +243,42 @@ export class World {
     }
   }
   _populateSettlement(settlement) {
-    const npcPerSettlement = 2;
-    for (let i = 0; i < npcPerSettlement; i++) {
+    // First, find the shop and create the shopkeeper
+    const shopBuilding = settlement.buildings.find((b) => b.isShop);
+    if (shopBuilding) {
       let x,
         y,
         attempts = 0;
       do {
-        const building =
-          settlement.buildings[
-            Math.floor(Math.random() * settlement.buildings.length)
-          ];
-        if (!building) continue;
+        x =
+          shopBuilding.x +
+          1 +
+          Math.floor(Math.random() * (shopBuilding.width - 2));
+        y =
+          shopBuilding.y +
+          1 +
+          Math.floor(Math.random() * (shopBuilding.height - 2));
+        attempts++;
+      } while (this.game.isTileOccupied(x, y) && attempts < 50);
+
+      if (attempts < 50) {
+        const shopkeeper = new Shopkeeper(this.game, x, y, settlement);
+        this.game.npcs.push(shopkeeper); // Add to npcs list for now
+        this.game.scheduler.add(shopkeeper, true);
+      }
+    }
+
+    // Then, populate other buildings with regular NPCs
+    const otherBuildings = settlement.buildings.filter((b) => !b.isShop);
+    const npcPerSettlement = 1; // 1 regular NPC + 1 shopkeeper
+    for (let i = 0; i < npcPerSettlement; i++) {
+      if (otherBuildings.length === 0) break;
+      const building = otherBuildings[i % otherBuildings.length];
+
+      let x,
+        y,
+        attempts = 0;
+      do {
         x = building.x + 1 + Math.floor(Math.random() * (building.width - 2));
         y = building.y + 1 + Math.floor(Math.random() * (building.height - 2));
         attempts++;
@@ -259,5 +291,27 @@ export class World {
       }
     }
     settlement.isPopulated = true;
+  }
+
+  getBuildingAt(x, y) {
+    const settlement = this.findNearestSettlement(x, y);
+    if (
+      !settlement ||
+      Math.hypot(x - settlement.x, y - settlement.y) > SETTLEMENT_RADIUS
+    ) {
+      return null;
+    }
+
+    for (const building of settlement.buildings) {
+      if (
+        x >= building.x &&
+        x < building.x + building.width &&
+        y >= building.y &&
+        y < building.y + building.height
+      ) {
+        return building;
+      }
+    }
+    return null;
   }
 }

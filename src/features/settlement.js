@@ -90,12 +90,16 @@ export class Settlement {
   _generateBuildings() {
     const buildings = [];
     const numBuildings = ROT.RNG.getUniformInt(2, 3);
+    const shopIndex = ROT.RNG.getUniformInt(0, numBuildings - 1);
+
     for (let i = 0; i < numBuildings; i++) {
       const building = {
         x: this.x + ROT.RNG.getUniformInt(-15, 15),
         y: this.y + ROT.RNG.getUniformInt(-15, 15),
         width: ROT.RNG.getUniformInt(5, 9),
         height: ROT.RNG.getUniformInt(5, 9),
+        isShop: i === shopIndex, // Designate one building as the shop
+        settlementName: this.name,
       };
       building.door = this._createDoorForBuilding(building);
       buildings.push(building);

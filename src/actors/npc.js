@@ -1,5 +1,6 @@
 // src/actors/npc.js
 import { terrainInfo } from "../terrain.js";
+import { createItem } from "../items.js";
 
 const firstNames = [
   "Bess",
@@ -86,6 +87,11 @@ export class NPC {
     this.color = "#3498db";
     this.name = generateNpcName();
     this.homeSettlement = homeSettlement;
+    this.inventory = [
+      createItem("money", {
+        quantity: Math.floor(Math.random() * 10) + 5, // 5 to 14 dollars
+      }),
+    ];
     // Assign a random dialogue set
     this.dialogues =
       dialogueSets[Math.floor(Math.random() * dialogueSets.length)];

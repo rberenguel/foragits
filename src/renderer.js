@@ -81,11 +81,12 @@ export class Renderer {
     // --- UPDATED TO CHECK GAME STATE ---
     if (this.game.gameState === "inventory") {
       this._drawInventoryScreen();
-    } else if (this.game.gameState === "help") {
-      this._drawHelpScreen();
     } else if (this.game.gameState === "map") {
       this._drawMapScreen();
+    } else if (this.game.gameState === "shopping") {
+      this._drawShopScreen();
     } else {
+      const currentlyVisibleEnemies = new Set();
       // FOV calculation and regular drawing
       this.visibleTiles.clear();
       const { x, y } = this.game.player;
@@ -102,56 +103,29 @@ export class Renderer {
 
       this.display.clear();
       this._drawMap();
-      this._drawEntities();
+      this._drawEntities(currentlyVisibleEnemies);
       this.updateUI();
-    }
-  }
-  _drawHelpScreen() {
-    this.display.clear();
-    this.bgCtx.clearRect(
-      0,
-      0,
-      this.backgroundCanvas.width,
-      this.backgroundCanvas.height,
-    );
 
-    this.display.drawText(2, 1, "%c{#fff}%b{#333}--- HELP ---");
-
-    let y = 3;
-    this.game.helpContent.forEach((line) => {
-      let cleanLine = line.replace(/`/g, ""); // remove backticks
-
-      if (cleanLine.trim().startsWith("### ")) {
-        // It's a level 3 title
-        cleanLine = cleanLine.replace("###", "").trim().toUpperCase();
-        // Style it: yellow text with decoration
-        this.display.drawText(2, y++, `%c{#ff0}--- ${cleanLine} ---`);
-      } else if (cleanLine.trim().startsWith("#### ")) {
-        // It's a level 4 title
-        cleanLine = cleanLine.replace("####", "").trim();
-        // Style it: slightly indented, white text
-        this.display.drawText(4, y++, `%c{#fff}${cleanLine}`);
-      } else {
-        this.display.drawText(2, y++, cleanLine);
+      // Check for new enemies
+      for (const enemy of currentlyVisibleEnemies) {
+        if (
+          !this.game.previouslyVisibleEnemies.has(enemy) &&
+          !enemy.isCorpse()
+        ) {
+          this.game.gameState = "announcement";
+          this.displayMessage(
+            `You spot ${enemy.name}! (Press [f] to continue)`,
+          );
+        }
       }
-    });
-
-    const closeText = "([?] or [esc] to close)";
-    this.display.drawText(
-      DISPLAY_WIDTH - closeText.length - 1,
-      DISPLAY_HEIGHT - 2,
-      closeText,
-    );
+      this.game.previouslyVisibleEnemies = currentlyVisibleEnemies;
+    }
   }
   // --- NEW METHOD TO DRAW THE INVENTORY SCREEN ---
   _drawInventoryScreen() {
     this.display.clear();
-    this.bgCtx.clearRect(
-      0,
-      0,
-      this.backgroundCanvas.width,
-      this.backgroundCanvas.height,
-    );
+    //this.bgCtx.clearRect(
+    //  0,
 
     this.display.drawText(2, 1, "%c{#fff}%b{#333}--- INVENTORY ---");
 
@@ -243,7 +217,7 @@ export class Renderer {
     this._drawSplatters(world, topLeftX, topLeftY);
   }
 
-  _drawEntities() {
+  _drawEntities(currentlyVisibleEnemies) {
     const { player, enemies, world } = this.game;
     const topLeftX = player.x - Math.floor(DISPLAY_WIDTH / 2);
     const topLeftY = player.y - Math.floor(DISPLAY_HEIGHT / 2);
@@ -263,6 +237,9 @@ export class Renderer {
     enemies.forEach((enemy) => {
       const isVisible = this.visibleTiles.has(`${enemy.x},${enemy.y}`);
       if (isVisible) {
+        if (currentlyVisibleEnemies) {
+          currentlyVisibleEnemies.add(enemy);
+        }
         const screenPos = this._worldToScreen(
           enemy.x,
           enemy.y,
@@ -292,8 +269,8 @@ export class Renderer {
     this.display.draw(
       Math.floor(DISPLAY_WIDTH / 2),
       Math.floor(DISPLAY_HEIGHT / 2),
-      "@",
-      "#773300",
+      player.char,
+      player.color,
     );
   }
 

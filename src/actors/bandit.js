@@ -119,6 +119,7 @@ export class Bandit {
     this.lastKnownPlayerPosition = null;
     this.baseSettlement = baseSettlement;
     this.playerIsVisible = false;
+    this.aimError = 5; // Base accuracy
 
     // --- ASSIGN NAME ON CREATION ---
     this.name = generateBanditName();
@@ -126,6 +127,9 @@ export class Bandit {
       createItem("revolver_rusty"),
       createItem("ammo_bullet", {
         quantity: Math.floor(Math.random() * 6) + 1,
+      }),
+      createItem("money", {
+        quantity: Math.floor(Math.random() * 5) + 1, // 1 to 5 dollars
       }),
     ];
     if (Math.random() < 0.15) {
@@ -179,7 +183,24 @@ export class Bandit {
       ) {
         if (this.isAiming) {
           this.isAiming = false;
-          this.game.attack(this, this.game.player);
+          weapon.loaded--;
+
+          if (Math.random() < (weapon.misfireChance || 0)) {
+            // Misfire, don't do anything else
+            return;
+          }
+
+          // Calculate angle to player
+          const dx = target.x - this.x;
+          const dy = target.y - this.y;
+          const angleToTarget = Math.atan2(dy, dx) * (180 / Math.PI);
+
+          // Add deviation
+          const totalError = (this.aimError || 0) + (weapon.aimError || 0);
+          const deviation = (Math.random() - 0.5) * totalError;
+          const finalAngle = angleToTarget + deviation;
+
+          this.game.resolveShot(this, finalAngle);
         } else {
           this.isAiming = true;
         }

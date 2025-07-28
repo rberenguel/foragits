@@ -1,5 +1,6 @@
 import { terrainInfo, TILE_TYPE } from "../terrain.js";
 import { createItem } from "../items.js";
+import { Shopkeeper } from "./shopkeeper.js";
 
 function getDirectionName(dx, dy) {
   if (dx === 0 && dy === 0) return "here";
@@ -25,9 +26,12 @@ export class Player {
     this.y = y;
     this.hp = 10;
     this.ammo = 6;
+    this.char = "@";
+    this.color = "#773300";
     this.isAiming = false;
     this.aimAngle = 0;
     this.isDucking = false;
+    this.aimError = 2; // Base accuracy
 
     this.money = 2;
     this.inventory = [
@@ -55,22 +59,41 @@ export class Player {
       return false; // Does not take a turn
     }
 
+    let itemsPickedUp = [];
+    let moneyFound = 0;
+
     for (const item of itemsOnTile) {
-      if (item.isStackable) {
+      if (item.type === "money") {
+        moneyFound += item.quantity;
+        this.money += item.quantity;
+      } else if (item.isStackable) {
         const existingStack = this.inventory.find((i) => i.name === item.name);
         if (existingStack) {
           existingStack.quantity += item.quantity;
         } else {
           this.inventory.push(item);
         }
+        itemsPickedUp.push(item.name);
       } else {
         this.inventory.push(item);
+        itemsPickedUp.push(item.name);
       }
     }
+
+    let message = "You pick up ";
+    if (itemsPickedUp.length > 0) {
+      message += `the ${itemsPickedUp.join(", ")}`;
+    }
+    if (moneyFound > 0) {
+      if (itemsPickedUp.length > 0) {
+        message += " and ";
+      }
+      message += `${moneyFound}`;
+    }
+    message += ".";
+
+    this.game.renderer.displayMessage(message);
     this.game.world.itemsOnGround.delete(itemKey);
-    this.game.renderer.displayMessage(
-      `You pick up the ${itemsOnTile.map((i) => i.name).join(", ")}.`,
-    );
 
     // Redraw immediately to remove items from map
     this.game.renderer.drawAll();
@@ -89,6 +112,22 @@ export class Player {
     }
     if (code === ROT.KEYS.VK_A) {
       this.isAiming = !this.isAiming;
+      if (this.isAiming) {
+        const building = this.game.world.getBuildingAt(this.x, this.y);
+        if (building && building.isShop) {
+          const shopkeeper = this.game.npcs.find(
+            (n) =>
+              n instanceof Shopkeeper &&
+              n.homeSettlement.name === building.settlementName,
+          );
+          if (shopkeeper) {
+            shopkeeper.isHostile = true;
+            this.game.renderer.displayMessage(
+              "The shopkeeper draws a shotgun!",
+            );
+          }
+        }
+      }
       this.game.renderer.drawAll();
       return;
     }
@@ -107,8 +146,19 @@ export class Player {
       }
       return; // Do nothing else while in inventory
     }
-    if (this.game.gameState === "help") {
-      if (e.key === "?" || code === ROT.KEYS.VK_ESCAPE) this.game.toggleHelp();
+    if (this.game.gameState === "shopping") {
+      if (code === ROT.KEYS.VK_ESCAPE) {
+        this.game.stopShopping();
+        return;
+      }
+      // TODO: Handle buying items
+      return;
+    }
+    if (this.game.gameState === "announcement") {
+      if (key === "f") {
+        this.game.gameState = "playing";
+      }
+      // No turn taken, just acknowledging the message
       return;
     }
     // Somehow ROT.KEYS.VK_QUESTION_MARK does not match this
@@ -245,15 +295,18 @@ export class Player {
     this.x = newX;
     this.y = newY;
     this.isDucking = false; // Moving cancels ducking
-    const corpse = this.game.enemies.find(
+    const actors = [...this.game.enemies, ...this.game.npcs];
+    const corpse = actors.find(
       (e) => e.x === this.x && e.y === this.y && e.isCorpse(),
     );
     if (corpse) {
-      const banditName = corpse.name || "an unnamed outlaw";
-      const settlementName = corpse.baseSettlement?.name || "the dusty plains";
-      const message = `Here lies ${banditName} from ${settlementName}.`;
+      const actorName = corpse.name || "an unnamed soul";
+      const settlementName =
+        corpse.baseSettlement?.name ||
+        corpse.homeSettlement?.name ||
+        "the dusty plains";
+      const message = `Here lies ${actorName} from ${settlementName}.`;
       this.game.renderer.displayMessage(message);
-      // They are never marked as read, they an always be re-checked
     }
     this._checkForPlacard();
     this._checkForItemsOnGround();
@@ -303,6 +356,15 @@ export class Player {
     }
 
     weapon.loaded--; // Consume one round
+    this.game.renderer.updateUI(); // Update immediately
+
+    // Check for misfire
+    if (Math.random() < (weapon.misfireChance || 0)) {
+      this.game.renderer.displayMessage(`Your ${weapon.name} misfired!`);
+      this.isAiming = false;
+      this.game.renderer.drawAll();
+      return true; // Misfire takes a turn
+    }
 
     const wasDucking = this.isDucking;
     if (wasDucking) {
@@ -310,41 +372,12 @@ export class Player {
       this.game.renderer.drawAll(); // Redraw to get the "glimpse"
     }
 
-    const rad = this.aimAngle * (Math.PI / 180);
-    const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
-    const line = this.game.getLine(
-      this.x,
-      this.y,
-      Math.round(this.x + aimVector.x * 20),
-      Math.round(this.y + aimVector.y * 20),
-    );
+    // Calculate accuracy deviation
+    const totalError = (this.aimError || 0) + (weapon.aimError || 0);
+    const deviation = (Math.random() - 0.5) * totalError;
+    const finalAngle = this.aimAngle + deviation;
 
-    for (let i = 1; i < line.length; i++) {
-      const point = line[i];
-      const enemy = this.game.enemies.find(
-        (e) => e.x === point.x && e.y === point.y && e.hp > 0,
-      );
-      if (enemy) {
-        this.game.attack(this, enemy, aimVector);
-        break;
-      }
-      const tile = this.game.world.getTileAt(point.x, point.y);
-      const info = terrainInfo[tile];
-      if (info && !info.isBulletPassable) {
-        if (tile === TILE_TYPE.CACTUS) {
-          this.game.renderer.createSplatterEffect(
-            point.x,
-            point.y,
-            aimVector,
-            "cactus",
-            10,
-          );
-        } else {
-          this.game.renderer.createRicochetEffect(point.x, point.y, aimVector);
-        }
-        break;
-      }
-    }
+    this.game.resolveShot(this, finalAngle);
 
     this.isAiming = false;
 
@@ -359,7 +392,6 @@ export class Player {
       this.game.renderer.drawAll();
     }
 
-    this.game.renderer.updateUI();
     return true; // A successful shot takes a turn
   }
   _talkToNPC() {
@@ -372,9 +404,13 @@ export class Player {
 
         const npc = this.game.npcs.find((n) => n.x === tileX && n.y === tileY);
         if (npc) {
-          this.game.renderer.displayMessage(
-            `"${npc.getNextDialogue()}" -${npc.name}`,
-          );
+          if (npc instanceof Shopkeeper) {
+            this.game.startShopping(npc);
+          } else {
+            this.game.renderer.displayMessage(
+              `"${npc.getNextDialogue()}" -${npc.name}`,
+            );
+          }
           talked = true;
           break;
         }
