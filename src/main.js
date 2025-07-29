@@ -118,12 +118,15 @@ class Game {
       if (target) {
         target.respondToChallenge(); // Let the bandit react
 
-        if (target.combatStance === "challenging") {
+        if (
+          target.combatStance === "challenging" ||
+          target.combatStance === "aiming"
+        ) {
           this.renderer.displayMessage("A Quickdraw!");
           this.resolveQuickdraw(player, target);
         } else {
           // Bandit didn't challenge back, player's shot hits cover
-          this.renderer.displayMessage("Your shot hits the bandit's cover!");
+          //this.renderer.displayMessage("Your shot hits the bandit's cover!");
           this.resolveShot(player, player.aimAngle);
         }
       } else {

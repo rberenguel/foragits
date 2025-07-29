@@ -123,7 +123,7 @@ export class Bandit {
     this.inventory = [
       createItem("revolver_rusty"),
       createItem("ammo_bullet", {
-        quantity: Math.floor(Math.random() * 6) + 4,
+        quantity: Math.floor(Math.random() * 6) + 18,
       }),
       createItem("money", { quantity: Math.floor(Math.random() * 5) + 1 }),
     ];
