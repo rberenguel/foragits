@@ -6,6 +6,7 @@ import {
   SETTLEMENT_RADIUS,
 } from "./constants.js";
 import { terrainInfo, TILE_TYPE } from "./terrain.js";
+import { Bandit } from "./actors/bandit.js";
 
 export class Renderer {
   constructor(game) {
@@ -35,25 +36,22 @@ export class Renderer {
       rotCanvas.width,
       rotCanvas.height,
     ];
-
     this.bgCtx = this.backgroundCanvas.getContext("2d");
     this.particleCtx = this.particleCanvas.getContext("2d");
-
     this.cellWidth = this.particleCanvas.width / DISPLAY_WIDTH;
     this.cellHeight = this.particleCanvas.height / DISPLAY_HEIGHT;
-
     this.particles = [];
     this.messageTimeout = null;
-
-    // --- NEW FOV PROPERTIES ---
     this.visibleTiles = new Set();
     this.exploredTiles = new Set();
+
+    // --- RE-IMPLEMENTED lightPasses with cover check ---
     const lightPasses = (x, y) => {
       const player = this.game.player;
       const tile = this.game.world.getTileAt(x, y);
       const info = terrainInfo[tile];
 
-      if (player.isDucking) {
+      if (player.combatStance === "ducking") {
         const dx = Math.abs(x - player.x);
         const dy = Math.abs(y - player.y);
         // Check if the tile is adjacent to the player
@@ -61,8 +59,8 @@ export class Renderer {
           const coverTypes = [
             TILE_TYPE.ROCK,
             TILE_TYPE.WALL,
-            TILE_TYPE.SETTLEMENT_WALL,
             TILE_TYPE.CACTUS,
+            TILE_TYPE.SETTLEMENT_WALL,
           ];
           // If it's a cover tile, it blocks vision while ducking
           if (coverTypes.includes(tile)) {
@@ -70,82 +68,65 @@ export class Renderer {
           }
         }
       }
-
-      // Otherwise, rely on the tile's natural transparency.
       return info?.isTransparent ?? false;
     };
     this.fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
   }
-
+  _drawShopScreen() {
+    // Placeholder for shop UI
+    this.display.clear();
+    this.display.drawText(2, 1, "SHOP IS OPEN - WIP");
+  }
   drawAll() {
-    // --- UPDATED TO CHECK GAME STATE ---
     if (this.game.gameState === "inventory") {
       this._drawInventoryScreen();
-    } else if (this.game.gameState === "map") {
-      this._drawMapScreen();
-    } else if (this.game.gameState === "shopping") {
-      this._drawShopScreen();
-    } else {
-      const currentlyVisibleEnemies = new Set();
-      // FOV calculation and regular drawing
-      this.visibleTiles.clear();
-      const { x, y } = this.game.player;
-      const radius = 15.5;
-      this.fov.compute(x, y, radius, (vx, vy, r, visibility) => {
-        const distance = Math.hypot(vx - x, vy - y);
-        if (visibility > 0 && distance <= radius) {
-          // Only include tiles within circular radius
-          const key = `${vx},${vy}`;
-          this.visibleTiles.add(key);
-          this.exploredTiles.add(key);
-        }
-      });
-
-      this.display.clear();
-      this._drawMap();
-      this._drawEntities(currentlyVisibleEnemies);
-      this.updateUI();
-
-      // Check for new enemies
-      for (const enemy of currentlyVisibleEnemies) {
-        if (
-          !this.game.previouslyVisibleEnemies.has(enemy) &&
-          !enemy.isCorpse()
-        ) {
-          this.game.gameState = "announcement";
-          this.displayMessage(
-            `You spot ${enemy.name}! (Press [f] to continue)`,
-          );
-        }
-      }
-      this.game.previouslyVisibleEnemies = currentlyVisibleEnemies;
+      return;
     }
+    if (this.game.gameState === "map") {
+      this._drawMapScreen();
+      return;
+    }
+    if (this.game.gameState === "shopping") {
+      this._drawShopScreen();
+      return;
+    }
+
+    const player = this.game.player;
+    const currentlyVisibleEnemies = new Set();
+    this.visibleTiles.clear();
+    const fovRadius = player.combatStance === "ducking" ? 5.5 : 15.5; // Reduced vision when ducking
+
+    this.fov.compute(player.x, player.y, fovRadius, (vx, vy, r, visibility) => {
+      const distance = Math.hypot(vx - player.x, vy - player.y);
+      if (visibility > 0 && distance <= fovRadius) {
+        const key = `${vx},${vy}`;
+        this.visibleTiles.add(key);
+        this.exploredTiles.add(key);
+      }
+    });
+
+    this.display.clear();
+    this._drawMap();
+    this._drawEntities(currentlyVisibleEnemies);
+    // --- DELEGATE SIGHTING LOGIC TO MAIN.JS ---
+    this.game.handleEnemySightings(currentlyVisibleEnemies);
+    this.updateUI();
   }
   // --- NEW METHOD TO DRAW THE INVENTORY SCREEN ---
   _drawInventoryScreen() {
     this.display.clear();
-    //this.bgCtx.clearRect(
-    //  0,
-
     this.display.drawText(2, 1, "%c{#fff}%b{#333}--- INVENTORY ---");
-
     let y = 3;
     this.game.player.inventory.forEach((item, index) => {
       const letter = String.fromCharCode("a".charCodeAt(0) + index);
       let itemText = `${letter}) ${item.name}`;
-      if (item.quantity) {
-        itemText += ` (x${item.quantity})`;
-      }
-      if (item.equipped) {
-        itemText += " (equipped)";
-      }
+      if (item.quantity) itemText += ` (x${item.quantity})`;
+      if (item.equipped) itemText += " (equipped)";
       this.display.drawText(2, y, itemText);
       y++;
     });
-
     y += 2;
     this.display.drawText(2, y, `Money: $${this.game.player.money}`);
-
     const closeText = "([i] or [esc] to close)";
     this.display.drawText(
       DISPLAY_WIDTH - closeText.length - 1,
@@ -158,7 +139,6 @@ export class Renderer {
     const { player, world } = this.game;
     const topLeftX = player.x - Math.floor(DISPLAY_WIDTH / 2);
     const topLeftY = player.y - Math.floor(DISPLAY_HEIGHT / 2);
-
     this.bgCtx.clearRect(
       0,
       0,
@@ -174,23 +154,15 @@ export class Renderer {
         const worldX = topLeftX + x;
         const worldY = topLeftY + y;
         const key = `${worldX},${worldY}`;
-
-        // --- UPDATED DRAW LOGIC FOR FOV ---
         const isVisible = this.visibleTiles.has(key);
         const isExplored = this.exploredTiles.has(key);
-
         if (!isVisible && !isExplored) continue;
-
         const tile = world.getTileAt(worldX, worldY);
         const info = terrainInfo[tile];
-        const pixelX = x * this.cellWidth;
-        const pixelY = y * this.cellHeight;
-        if (!info) continue; // Should not happen
+        if (!info) continue;
         let fgColor = info.color;
         let bgColor = terrainInfo["."].color;
-
         if (!isVisible) {
-          // It's explored, but not visible
           fgColor = ROT.Color.toRGB(
             ROT.Color.interpolate(
               ROT.Color.fromString(fgColor),
@@ -200,16 +172,19 @@ export class Renderer {
           );
           bgColor = "#423e37";
         }
-
         this.bgCtx.fillStyle = bgColor;
-        this.bgCtx.fillRect(pixelX, pixelY, this.cellWidth, this.cellHeight);
-
+        this.bgCtx.fillRect(
+          x * this.cellWidth,
+          y * this.cellHeight,
+          this.cellWidth,
+          this.cellHeight,
+        );
         if (tile !== ".") {
           this.bgCtx.fillStyle = fgColor;
           this.bgCtx.fillText(
             tile,
-            pixelX + this.cellWidth / 2,
-            pixelY + this.cellHeight / 2,
+            x * this.cellWidth + this.cellWidth / 2,
+            y * this.cellHeight + this.cellHeight / 2,
           );
         }
       }
@@ -218,54 +193,39 @@ export class Renderer {
   }
 
   _drawEntities(currentlyVisibleEnemies) {
-    const { player, enemies, world } = this.game;
+    const { player, enemies, npcs, world } = this.game;
     const topLeftX = player.x - Math.floor(DISPLAY_WIDTH / 2);
     const topLeftY = player.y - Math.floor(DISPLAY_HEIGHT / 2);
+
     for (const [key, items] of world.itemsOnGround.entries()) {
       if (this.visibleTiles.has(key) && items.length > 0) {
         const [x, y] = key.split(",").map(Number);
-
         const screenPos = this._worldToScreen(x, y, topLeftX, topLeftY);
-        if (screenPos) {
-          // Draw the first item in the stack
-          const item = items[0];
-          this.display.draw(screenPos.x, screenPos.y, item.char, item.color);
-        }
+        if (screenPos)
+          this.display.draw(
+            screenPos.x,
+            screenPos.y,
+            items[0].char,
+            items[0].color,
+          );
       }
     }
-    // Only draw enemies if they are visible
-    enemies.forEach((enemy) => {
-      const isVisible = this.visibleTiles.has(`${enemy.x},${enemy.y}`);
+    const allActors = [...enemies, ...npcs];
+    allActors.forEach((actor) => {
+      const isVisible = this.visibleTiles.has(`${actor.x},${actor.y}`);
       if (isVisible) {
-        if (currentlyVisibleEnemies) {
-          currentlyVisibleEnemies.add(enemy);
-        }
+        if (actor instanceof Bandit && currentlyVisibleEnemies)
+          currentlyVisibleEnemies.add(actor);
         const screenPos = this._worldToScreen(
-          enemy.x,
-          enemy.y,
-          player.x - Math.floor(DISPLAY_WIDTH / 2),
-          player.y - Math.floor(DISPLAY_HEIGHT / 2),
+          actor.x,
+          actor.y,
+          topLeftX,
+          topLeftY,
         );
         if (screenPos)
-          this.display.draw(screenPos.x, screenPos.y, enemy.char, enemy.color);
+          this.display.draw(screenPos.x, screenPos.y, actor.char, actor.color);
       }
     });
-    // Draw NPCs
-    this.game.npcs.forEach((npc) => {
-      const isVisible = this.visibleTiles.has(`${npc.x},${npc.y}`);
-      if (isVisible) {
-        const screenPos = this._worldToScreen(
-          npc.x,
-          npc.y,
-          player.x - Math.floor(DISPLAY_WIDTH / 2),
-          player.y - Math.floor(DISPLAY_HEIGHT / 2),
-        );
-        if (screenPos) {
-          this.display.draw(screenPos.x, screenPos.y, npc.char, npc.color);
-        }
-      }
-    });
-
     this.display.draw(
       Math.floor(DISPLAY_WIDTH / 2),
       Math.floor(DISPLAY_HEIGHT / 2),
@@ -370,33 +330,36 @@ export class Renderer {
   }
 
   _drawAimLines() {
-    const { player, enemies } = this.game;
-    if (player.isAiming) {
-      const rad = player.aimAngle * (Math.PI / 180);
-      const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
-      const line = this.game.getLine(
-        player.x,
-        player.y,
-        Math.round(player.x + aimVector.x * 20),
-        Math.round(player.y + aimVector.y * 20),
-      );
-
-      const finalPoint = line[line.length - 1];
-      this._drawAimLineOnCanvas(
-        null,
-        finalPoint,
-        "rgba(255, 255, 0, 0.5)",
-        [5, 5],
-      );
-    }
-
-    enemies.forEach((enemy) => {
-      const isVisible = this.visibleTiles.has(`${enemy.x},${enemy.y}`);
-      if (enemy.isAiming && !enemy.isCorpse() && isVisible) {
-        this._drawAimLineOnCanvas(enemy, player, "rgba(255, 0, 0, 0.3)", []);
+    // --- ROBUST AIM LINE LOGIC ---
+    const actors = [this.game.player, ...this.game.enemies];
+    actors.forEach((actor) => {
+      if (
+        (actor.combatStance === "challenging" ||
+          actor.combatStance === "aiming") &&
+        !actor.isCorpse()
+      ) {
+        // Check hp > 0
+        const angle = actor._getAngleToPlayer(); // Use the standardized method
+        const rad = angle * (Math.PI / 180);
+        const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
+        const endPoint = {
+          x: Math.round(actor.x + aimVector.x * 20),
+          y: Math.round(actor.y + aimVector.y * 20),
+        };
+        const color =
+          actor instanceof this.game.player.constructor
+            ? "rgba(255, 255, 0, 0.5)"
+            : "rgba(255, 0, 0, 0.4)";
+        this._drawAimLineOnCanvas(
+          actor,
+          endPoint,
+          color,
+          actor === this.game.player ? [5, 5] : [],
+        );
       }
     });
   }
+
   _drawMapScreen() {
     this.display.clear();
     this.bgCtx.clearRect(
@@ -467,31 +430,28 @@ export class Renderer {
   _drawAimLineOnCanvas(startActor, endActorOrPoint, color, dash) {
     const topLeftX = this.game.player.x - Math.floor(DISPLAY_WIDTH / 2);
     const topLeftY = this.game.player.y - Math.floor(DISPLAY_HEIGHT / 2);
+    const startScreen = this._worldToScreen(
+      startActor.x,
+      startActor.y,
+      topLeftX,
+      topLeftY,
+    );
+    if (!startScreen) return;
+    const startPixelX = startScreen.x * this.cellWidth + this.cellWidth / 2;
+    const startPixelY = startScreen.y * this.cellHeight + this.cellHeight / 2;
+    const endScreenX = endActorOrPoint.x - topLeftX;
+    const endScreenY = endActorOrPoint.y - topLeftY;
+    const endPixelX = endScreenX * this.cellWidth + this.cellWidth / 2;
+    const endPixelY = endScreenY * this.cellHeight + this.cellHeight / 2;
 
-    const startScreen = startActor
-      ? this._worldToScreen(startActor.x, startActor.y, topLeftX, topLeftY)
-      : { x: DISPLAY_WIDTH / 2, y: DISPLAY_HEIGHT / 2 };
-
-    if (startScreen && endActorOrPoint) {
-      const startPixelX = startScreen.x * this.cellWidth + this.cellWidth / 2;
-      const startPixelY = startScreen.y * this.cellHeight + this.cellHeight / 2;
-
-      // Calculate screen coordinates for the endpoint without boundary checks
-      const endScreenX = endActorOrPoint.x - topLeftX;
-      const endScreenY = endActorOrPoint.y - topLeftY;
-
-      const endPixelX = endScreenX * this.cellWidth + this.cellWidth / 2;
-      const endPixelY = endScreenY * this.cellHeight + this.cellHeight / 2;
-
-      this.particleCtx.beginPath();
-      this.particleCtx.setLineDash(dash);
-      this.particleCtx.moveTo(startPixelX, startPixelY);
-      this.particleCtx.lineTo(endPixelX, endPixelY);
-      this.particleCtx.strokeStyle = color;
-      this.particleCtx.lineWidth = dash.length > 0 ? 2 : 1;
-      this.particleCtx.stroke();
-      this.particleCtx.setLineDash([]);
-    }
+    this.particleCtx.beginPath();
+    this.particleCtx.setLineDash(dash);
+    this.particleCtx.moveTo(startPixelX, startPixelY);
+    this.particleCtx.lineTo(endPixelX, endPixelY);
+    this.particleCtx.strokeStyle = color;
+    this.particleCtx.lineWidth = 2;
+    this.particleCtx.stroke();
+    this.particleCtx.setLineDash([]);
   }
 
   _animateParticles() {
@@ -590,15 +550,11 @@ export class Renderer {
   displayMessage(message) {
     const log = document.getElementById("message-log");
     log.textContent = message;
-
     if (this.messageTimeout) clearTimeout(this.messageTimeout);
-
     this.messageTimeout = setTimeout(() => {
       log.textContent = "";
-      this.messageTimeout = null;
-    }, 4000); // Message disappears after 4 seconds
+    }, 4000);
   }
-
   flashScreen() {
     const flash = document.getElementById("flash-overlay");
     flash.style.display = "block";
@@ -612,8 +568,8 @@ export class Renderer {
     const weapon = player.getEquippedWeapon();
     const ammoText = weapon ? `${weapon.loaded}/${weapon.capacity}` : "N/A";
     const ui = document.getElementById("game-ui");
-    const aimingText = player.isAiming ? " [AIMING]" : "";
-    const duckingText = player.isDucking ? " [DUCKING]" : "";
-    ui.textContent = `HP: ${player.hp}/10 | Ammo: ${ammoText}${aimingText}${duckingText}`;
+    // --- UPDATED to show stance ---
+    const stanceText = `[${player.combatStance.toUpperCase()}]`;
+    ui.textContent = `HP: ${player.hp}/10 | Ammo: ${ammoText} | ${stanceText}`;
   }
 }

@@ -18,7 +18,7 @@ const itemTemplates = {
     char: "r",
     color: "#a35229",
     type: "weapon",
-    damage: "1d4",
+    damage: "1d3",
     capacity: 6,
     loaded: 6,
     aimError: 15, // Degrees of deviation
@@ -29,7 +29,7 @@ const itemTemplates = {
     char: "S",
     color: "#8b4513",
     type: "weapon",
-    damage: "2d5", // Deals high damage at close range
+    damage: "2d8", // Deals high damage at close range
     capacity: 2,
     loaded: 2,
     aimError: 25, // Very inaccurate at range

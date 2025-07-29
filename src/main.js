@@ -7,6 +7,7 @@ import { Renderer } from "./renderer.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from "./constants.js";
 import { terrainInfo } from "./terrain.js";
 import { rollDice } from "./utils.js";
+import { TILE_TYPE } from "./terrain.js";
 
 class Game {
   constructor() {
@@ -18,10 +19,9 @@ class Game {
     this.scheduler = new ROT.Scheduler.Simple();
     this.engine = new ROT.Engine(this.scheduler);
     this.gameState = "playing";
-    this.turn = 0; // Confirm ROT does not have this built-in
-    this.helpContent = [];
+    this.turn = 0;
     this.activeShopkeeper = null;
-    this.previouslyVisibleEnemies = new Set();
+    this.seenEnemies = new Set();
   }
 
   async init() {
@@ -29,16 +29,12 @@ class Game {
     document
       .getElementById("help-button")
       .addEventListener("click", () => this.toggleHelp());
-    // for (let i = 0; i < 5; i++) this._spawnEnemy(); // Removed initial spawn
+
     const turnManager = {
       act: () => {
         this.turn++;
-        // Every 100 turns, check if we need to spawn a new bandit
-        if (this.turn % 100 === 0) {
-          if (this.enemies.length < 10) {
-            // Max 10 bandits at a time
-            this._spawnBanditAtEdge();
-          }
+        if (this.turn % 100 === 0 && this.enemies.length < 10) {
+          this._spawnBanditAtEdge();
         }
       },
     };
@@ -57,71 +53,127 @@ class Game {
         (line) => line.trim() === "## Help",
       );
       if (helpStartIndex !== -1) {
-        const rawLines = lines.slice(helpStartIndex + 1);
-        let htmlContent = "";
-        rawLines.forEach((line) => {
-          line = line.replace(/`/g, "<code>");
-          if (line.trim().startsWith("###")) {
-            htmlContent += `<h3>${line.replace("###", "").trim()}</h3>`;
-          } else if (line.trim().startsWith("##")) {
-            htmlContent += `<h2>${line.replace("##", "").trim()}</h2>`;
-          } else if (line.trim()) {
-            htmlContent += `<p>${line.trim()}</p>`;
-          }
-        });
-        document.getElementById("help-screen").innerHTML = htmlContent;
+        document.getElementById("help-screen").innerHTML = lines
+          .slice(helpStartIndex + 1)
+          .join("\n")
+          .replace(/`/g, "<code>")
+          .replace(/### (.*)/g, "<h3>$1</h3>")
+          .replace(/## (.*)/g, "<h2>$1</h2>")
+          .replace(/\n\n/g, "<p>");
       }
     } catch (error) {
-      console.error("Failed to load help content from README.md:", error);
-      document.getElementById("help-screen").innerHTML =
-        "<p>Error loading help.</p>";
+      console.error("Failed to load help content:", error);
     }
   }
   toggleMap() {
-    if (this.gameState !== "map") {
-      this.gameState = "map";
-    } else {
-      this.gameState = "playing";
-    }
+    this.gameState = this.gameState === "map" ? "playing" : "map";
     this.renderer.drawAll();
   }
   toggleHelp() {
     const helpScreen = document.getElementById("help-screen");
     const isVisible = !helpScreen.classList.contains("hidden");
+    helpScreen.classList.toggle("hidden");
+    isVisible ? this.engine.unlock() : this.engine.lock();
+  }
+  handleEnemySightings(currentlyVisibleEnemies) {
+    // If we're already paused, don't do anything.
+    if (this.gameState === "announcement") return;
 
-    if (isVisible) {
-      helpScreen.classList.add("hidden");
-      this.engine.unlock();
-      window.removeEventListener("keydown", this.boundHelpKeyHandler);
-    } else {
-      helpScreen.classList.remove("hidden");
-      this.engine.lock();
-      this.boundHelpKeyHandler = this.handleHelpKeys.bind(this);
-      window.addEventListener("keydown", this.boundHelpKeyHandler);
+    let newEnemySpotted = false;
+    for (const enemy of currentlyVisibleEnemies) {
+      if (!this.seenEnemies.has(enemy)) {
+        this.seenEnemies.add(enemy);
+        this.renderer.displayMessage(
+          `You spot ${enemy.name}! (Press [f] to continue)`,
+        );
+        newEnemySpotted = true;
+      }
+    }
+
+    if (newEnemySpotted) {
+      this.gameState = "announcement";
     }
   }
-
   handleHelpKeys(e) {
     if (e.key === "?" || e.key === "Escape") {
       e.preventDefault();
       this.toggleHelp();
     }
   }
-
-  toggleInventory() {
-    if (this.gameState === "playing") {
-      this.gameState = "inventory";
-    } else if (this.gameState === "inventory") {
-      this.gameState = "playing";
+  playerFire(player) {
+    const weapon = player.getEquippedWeapon();
+    if (!weapon || weapon.loaded <= 0) {
+      this.renderer.displayMessage("Click.");
+      return false; // Does not take a turn
     }
-    this.renderer.drawAll(); // Redraw the screen with the correct view
+
+    weapon.loaded--; // Consume ammo
+
+    // If challenging from cover, it's a Quickdraw situation
+    if (player.combatStance === "challenging") {
+      const target = this.enemies.find(
+        (e) => !e.isCorpse() && this.renderer.visibleTiles.has(`${e.x},${e.y}`),
+      );
+
+      if (target) {
+        target.respondToChallenge(); // Let the bandit react
+
+        if (target.combatStance === "challenging") {
+          this.renderer.displayMessage("A Quickdraw!");
+          this.resolveQuickdraw(player, target);
+        } else {
+          // Bandit didn't challenge back, player's shot hits cover
+          this.renderer.displayMessage("Your shot hits the bandit's cover!");
+          this.resolveShot(player, player.aimAngle);
+        }
+      } else {
+        // No living target, just shoot at the environment
+        this.renderer.displayMessage("You fire from cover.");
+        this.resolveShot(player, player.aimAngle);
+      }
+      player.combatStance = "ducking"; // Return to ducking after the shot
+    } else if (player.combatStance === "aiming") {
+      // Standard shot from a standing position
+      this.renderer.displayMessage("You fire!");
+      this.resolveShot(player, player.aimAngle);
+      player.combatStance = "standing"; // Return to standing after the shot
+    }
+
+    return true; // Firing always takes a turn
+  }
+
+  resolveQuickdraw(player, bandit) {
+    this.renderer.displayMessage("A Quickdraw!");
+
+    // The bandit also consumes its ammo and turn
+    const banditWeapon = bandit.getEquippedWeapon();
+    if (banditWeapon && banditWeapon.loaded > 0) {
+      banditWeapon.loaded--;
+    }
+
+    const playerWins = Math.random() >= 0.5;
+    const winner = playerWins ? player : bandit;
+    const loser = playerWins ? bandit : player;
+
+    this.renderer.displayMessage(`${winner.name} is faster!`);
+
+    // Winner gets an accuracy bonus (negative error)
+    // Loser gets a panic shot (large accuracy penalty)
+    this.resolveShot(winner, winner._getAngleToPlayer(), -5); // -5 degree bonus
+    this.resolveShot(loser, loser._getAngleToPlayer(), 20); // +20 degree penalty
+
+    winner.combatStance = "ducking";
+    loser.combatStance = "ducking";
+  }
+  toggleInventory() {
+    this.gameState = this.gameState === "inventory" ? "playing" : "inventory";
+    this.renderer.drawAll();
   }
   startShopping(shopkeeper) {
     this.activeShopkeeper = shopkeeper;
     this.gameState = "shopping";
     this.renderer.drawAll();
   }
-
   stopShopping() {
     this.activeShopkeeper = null;
     this.gameState = "playing";
@@ -251,8 +303,67 @@ class Game {
     return points;
   }
 
-  resolveShot(attacker, angleInDegrees) {
-    const rad = angleInDegrees * (Math.PI / 180);
+  initiateQuickdraw(challenger) {
+    const weapon = challenger.getEquippedWeapon();
+    if (!weapon || weapon.loaded <= 0) {
+      this.renderer.displayMessage("Click.");
+      return false;
+    }
+
+    // Find target
+    // For now, player's only target is the nearest visible enemy
+    const target = this.enemies.find(
+      (e) => !e.isCorpse() && this.renderer.visibleTiles.has(`${e.x},${e.y}`),
+    );
+
+    if (!target) {
+      this.renderer.displayMessage("There is no one to shoot at.");
+      return false;
+    }
+
+    // Announce the challenge and give target a chance to respond
+    target.respondToChallenge();
+
+    // Check for Quickdraw
+    if (
+      challenger.combatStance === "challenging" &&
+      target.combatStance === "challenging"
+    ) {
+      this.renderer.displayMessage("A Quickdraw!");
+      // Simple speed roll. Could be enhanced with weapon stats.
+      const playerWins = Math.random() >= 0.5;
+      const winner = playerWins ? challenger : target;
+      const loser = playerWins ? target : challenger;
+
+      this.renderer.displayMessage(`${winner.name} is faster!`);
+      this.resolveShot(
+        winner,
+        winner._getAngleToPlayer ? winner._getAngleToPlayer() : winner.aimAngle,
+      );
+      loser.takeDamage(rollDice(winner.getEquippedWeapon().damage)); // Apply direct damage
+
+      winner.combatStance = "ducking";
+      loser.combatStance = "ducking";
+    } else {
+      // Standard shot against cover
+      this.renderer.displayMessage("The shot rings out!");
+      this.resolveShot(challenger, challenger.aimAngle);
+      challenger.combatStance = "ducking";
+    }
+
+    challenger.getEquippedWeapon().loaded--;
+    this.renderer.drawAll();
+    return true; // The action took a turn
+  }
+
+  resolveShot(attacker, angleInDegrees, accuracyModifier = 0) {
+    const weapon = attacker.getEquippedWeapon();
+    const totalError =
+      (weapon?.aimError || 0) + (attacker.aimError || 0) + accuracyModifier;
+    const deviation = (Math.random() - 0.5) * Math.max(0, totalError); // Ensure error isn't negative
+    const finalAngle = angleInDegrees + deviation;
+
+    const rad = finalAngle * (Math.PI / 180);
     const aimVector = { x: Math.cos(rad), y: Math.sin(rad) };
     const line = this.getLine(
       attacker.x,
@@ -263,43 +374,34 @@ class Game {
 
     for (let i = 1; i < line.length; i++) {
       const point = line[i];
-
-      // Check for player
-      if (
-        this.player.x === point.x &&
-        this.player.y === point.y &&
-        attacker !== this.player
-      ) {
-        this.attack(attacker, this.player, aimVector);
-        return; // Stop after hitting the first target
-      }
-
-      // Check for enemies
-      const enemy = this.enemies.find(
-        (e) => e.x === point.x && e.y === point.y && e.hp > 0,
+      const targetActor = [this.player, ...this.enemies, ...this.npcs].find(
+        (actor) =>
+          !actor.isCorpse() &&
+          actor.x === point.x &&
+          actor.y === point.y &&
+          actor !== attacker,
       );
-      if (enemy && attacker !== enemy) {
-        this.attack(attacker, enemy, aimVector);
-        return; // Stop after hitting the first target
+
+      if (targetActor) {
+        // A 'challenging' actor is EXPOSED and can be hit directly.
+        if (targetActor.combatStance === "ducking") {
+          this.renderer.displayMessage(
+            `The shot hits ${targetActor.name}'s cover!`,
+          );
+          this.renderer.createRicochetEffect(point.x, point.y, aimVector);
+        } else {
+          this.attack(attacker, targetActor, aimVector);
+        }
+        return;
       }
 
-      // Check for NPCs (including shopkeepers)
-      const npc = this.npcs.find(
-        (n) => n.x === point.x && n.y === point.y && n.hp > 0,
-      );
-      if (npc && attacker !== npc) {
-        this.attack(attacker, npc, aimVector);
-        return; // Stop after hitting the first target
-      }
-
-      // Check for terrain collision
       const tile = this.world.getTileAt(point.x, point.y);
       const info = terrainInfo[tile];
       if (info && !info.isBulletPassable) {
         const cactusTypes = [
-          "Ψ", // TILE_TYPE.CACTUS,
-          "☨", // TILE_TYPE.CACTUS_2,
-          "‡", // TILE_TYPE.CACTUS_3,
+          TILE_TYPE.CACTUS,
+          TILE_TYPE.CACTUS_2,
+          TILE_TYPE.CACTUS_3,
         ];
         if (cactusTypes.includes(tile)) {
           this.renderer.createSplatterEffect(
@@ -312,76 +414,26 @@ class Game {
         } else {
           this.renderer.createRicochetEffect(point.x, point.y, aimVector);
         }
-        return; // Stop after hitting terrain
+        return;
       }
     }
   }
-
-  attack(attacker, target, aimVector = null) {
-    // The attack method now just applies damage and effects
-    if (target.isDucking) {
-      if (target instanceof Player) {
-        this.renderer.displayMessage("The bandit's shot hits your cover!");
-      } else {
-        this.renderer.displayMessage("Your shot hits the bandit's cover!");
-      }
-      // Maybe add a ricochet effect on the cover tile later
-      return;
-    }
-
+  attack(attacker, target, aimVector, directDamage = null) {
     const weapon = attacker.getEquippedWeapon();
-    if (!weapon) return; // Should not happen if called from resolveShot
+    if (!weapon) return;
 
-    let damage = rollDice(weapon.damage);
-
-    // Special shopkeeper shotgun logic
-    if (attacker instanceof Shopkeeper && weapon.templateId === "shotgun") {
-      const distance = Math.hypot(target.x - attacker.x, target.y - attacker.y);
-      if (distance < 5) {
-        damage = 10; // Max damage at close range
-      }
-    }
-
-    if (target instanceof Player) {
-      this.renderer.displayMessage(`You are shot by ${attacker.name}!`);
-      target.takeDamage(damage);
-      if (attacker instanceof Shopkeeper && weapon.templateId === "shotgun") {
-        this.renderer.createSplatterEffect(
-          target.x,
-          target.y,
-          aimVector,
-          "blood",
-          40, // More blood for shotgun
-        );
-      }
-    } else if (target instanceof Bandit || target instanceof Shopkeeper) {
-      target.hp -= damage;
-      this.renderer.displayMessage(
-        `You hit ${target.name} for ${damage} damage!`,
-      );
-
-      if (target instanceof Shopkeeper) {
-        target.isHostile = true;
-      }
-
-      const distance = Math.hypot(target.x - attacker.x, target.y - attacker.y);
-      const particleCount = Math.max(5, Math.floor(25 - distance));
+    const damage = directDamage ?? rollDice(weapon.damage);
+    this.renderer.displayMessage(`${target.name} is hit for ${damage} damage!`);
+    if (aimVector) {
       this.renderer.createSplatterEffect(
         target.x,
         target.y,
         aimVector,
         "blood",
-        particleCount,
+        15,
       );
-
-      if (target.hp <= 0) this.killEnemy(target);
-    } else if (target instanceof NPC) {
-      target.hp -= damage;
-      this.renderer.displayMessage(
-        `You hit ${target.name} for ${damage} damage!`,
-      );
-      if (target.hp <= 0) this.killEnemy(target);
     }
+    target.takeDamage(damage);
   }
 
   killEnemy(enemy) {
@@ -389,27 +441,23 @@ class Game {
     this.renderer.displayMessage(`You killed ${enemy.name}.`);
     enemy.char = "†";
     enemy.color = "#8B0000";
+    // ... (rest of the logic is fine)
     if (enemy.inventory.length > 0) {
       const dropCoords = { x: enemy.x, y: enemy.y };
       const validDropTiles = [];
-      // Find adjacent passable tiles
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dy === 0) continue;
           const x = dropCoords.x + dx;
           const y = dropCoords.y + dy;
-          const tileChar = this.world.getTileAt(x, y);
-          if (terrainInfo[tileChar]?.isPassable) {
+          if (terrainInfo[this.world.getTileAt(x, y)]?.isPassable) {
             validDropTiles.push({ x, y });
           }
         }
       }
-
-      // Drop each item
       for (const item of enemy.inventory) {
-        let tileToDropOn = dropCoords; // Default to corpse tile
+        let tileToDropOn = dropCoords;
         if (validDropTiles.length > 0) {
-          // Pick a random valid tile and remove it from the list
           const tileIndex = Math.floor(Math.random() * validDropTiles.length);
           tileToDropOn = validDropTiles.splice(tileIndex, 1)[0];
         }
@@ -438,10 +486,8 @@ class Game {
       "corpse",
       15,
     );
-    this.renderer.drawAll(); // Redraw to show the tombstone
-    const ui = document.getElementById("game-ui");
-    ui.textContent = "YOU DIED";
-    ui.style.color = "red";
+    this.renderer.drawAll();
+    document.getElementById("game-ui").textContent = "YOU DIED";
   }
 }
 

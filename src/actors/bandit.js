@@ -1,6 +1,7 @@
-import { terrainInfo } from "../terrain.js";
+// src/actors/bandit.js
+import { terrainInfo, TILE_TYPE } from "../terrain.js";
 import { createItem } from "../items.js";
-// --- NEW: BANDIT NAME GENERATOR ---
+// --- (Name generation code is unchanged) ---
 const firstNames = [
   "Jed",
   "Silas",
@@ -38,8 +39,6 @@ const firstNames = [
   "Elijah",
   "Finn",
 ];
-
-// LAST NAMES (Hard-sounding, descriptive, or famous outlaw surnames)
 const lastNames = [
   "Blackwood",
   "Stone",
@@ -76,8 +75,6 @@ const lastNames = [
   "Barlow",
   "Cobb",
 ];
-
-// EPITHETS (Based on skill, a notable kill, appearance, or vice)
 const epithets = [
   "'One-Eye'",
   "'Scar'",
@@ -112,25 +109,23 @@ export class Bandit {
     this.game = game;
     this.x = x;
     this.y = y;
-    this.hp = 1.0;
+    this.hp = 2.0;
     this.char = "Č";
     this.color = "#654321";
-    this.isAiming = false;
     this.lastKnownPlayerPosition = null;
     this.baseSettlement = baseSettlement;
-    this.playerIsVisible = false;
-    this.aimError = 5; // Base accuracy
-
-    // --- ASSIGN NAME ON CREATION ---
     this.name = generateBanditName();
+    this.aimError = 8;
+
+    // --- NEW STATE MACHINE ---
+    this.combatStance = "standing"; // 'standing', 'ducking', 'challenging'
+
     this.inventory = [
       createItem("revolver_rusty"),
       createItem("ammo_bullet", {
-        quantity: Math.floor(Math.random() * 6) + 1,
+        quantity: Math.floor(Math.random() * 6) + 4,
       }),
-      createItem("money", {
-        quantity: Math.floor(Math.random() * 5) + 1, // 1 to 5 dollars
-      }),
+      createItem("money", { quantity: Math.floor(Math.random() * 5) + 1 }),
     ];
     if (Math.random() < 0.15) {
       this.inventory.push(createItem("can_of_beans"));
@@ -141,94 +136,155 @@ export class Bandit {
     };
     this.fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
   }
+
   getEquippedWeapon() {
     return this.inventory.find((i) => i.type === "weapon");
   }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    this.combatStance = "standing"; // Getting hit forces you out of cover
+    if (this.hp <= 0) {
+      this.game.killEnemy(this);
+    }
+  }
+
+  // src/actors/bandit.js
+
   act() {
-    if (this.game.player.hp <= 0) return;
+    if (this.isCorpse() || this.game.player.hp <= 0) {
+      return;
+    }
 
-    // 1. PERCEPTION
+    // --- 1. Perception (No change) ---
     let isPlayerInLOS = false;
-    this.fov.compute(this.x, this.y, 8, (x, y, r, visibility) => {
-      if (x === this.game.player.x && y === this.game.player.y) {
-        if (visibility > 0) {
-          isPlayerInLOS = true;
-        }
-      }
+    this.fov.compute(this.x, this.y, 10, (x, y, r, v) => {
+      if (x === this.game.player.x && y === this.game.player.y && v > 0)
+        isPlayerInLOS = true;
     });
-
-    // A ducking player is not visible, even if in line-of-sight.
-    this.playerIsVisible = isPlayerInLOS && !this.game.player.isDucking;
-
-    if (this.playerIsVisible) {
+    const playerIsVisible =
+      isPlayerInLOS && this.game.player.combatStance !== "ducking";
+    if (playerIsVisible) {
       this.lastKnownPlayerPosition = {
         x: this.game.player.x,
         y: this.game.player.y,
       };
     }
 
-    // 2. DECISION MAKING
-    const target = this.lastKnownPlayerPosition;
+    // --- 2. Execute Committed Action or Reload ---
+    const weapon = this.getEquippedWeapon();
+    if (this.combatStance === "challenging" || this.combatStance === "aiming") {
+      if (weapon && weapon.loaded > 0) {
+        weapon.loaded--;
+        this.game.resolveShot(this, this._getAngleToPlayer());
+        this.combatStance = this._isAdjacentToCover() ? "ducking" : "standing";
+      } else {
+        // Was aiming but ran out of ammo, must reload or flee.
+        if (this._reloadWeapon()) {
+          this.game.renderer.displayMessage(`${this.name} reloads!`);
+        }
+        this.combatStance = "standing";
+      }
+      return; // Turn is over.
+    }
 
-    if (target) {
-      const distance = Math.hypot(this.x - target.x, this.y - target.y);
-      const weapon = this.getEquippedWeapon();
-
-      // UPDATED: Check for ammo before deciding to shoot
-      if (
-        this.playerIsVisible &&
-        distance <= 12 &&
-        weapon &&
-        weapon.loaded > 0
-      ) {
-        if (this.isAiming) {
-          this.isAiming = false;
-          weapon.loaded--;
-
-          if (Math.random() < (weapon.misfireChance || 0)) {
-            // Misfire, don't do anything else
-            return;
-          }
-
-          // Calculate angle to player
-          const dx = target.x - this.x;
-          const dy = target.y - this.y;
-          const angleToTarget = Math.atan2(dy, dx) * (180 / Math.PI);
-
-          // Add deviation
-          const totalError = (this.aimError || 0) + (weapon.aimError || 0);
-          const deviation = (Math.random() - 0.5) * totalError;
-          const finalAngle = angleToTarget + deviation;
-
-          this.game.resolveShot(this, finalAngle);
+    // --- 3. Decide Next Action ---
+    if (this.lastKnownPlayerPosition) {
+      // Check for ammo before engaging
+      if (!weapon || weapon.loaded <= 0) {
+        if (this._reloadWeapon()) {
+          this.game.renderer.displayMessage(`${this.name} reloads!`);
+          this.combatStance = "ducking"; // Reloading is safest in cover
         } else {
-          this.isAiming = true;
+          // No ammo to reload, must flee.
+          this.combatStance = "standing";
+          this._pathfindToGoal();
         }
         return;
       }
 
-      // If not shooting, move towards the target
-      this.isAiming = false;
-      this._moveAlongPathTo(target);
-
-      if (this.x === target.x && this.y === target.y) {
-        this.lastKnownPlayerPosition = null;
+      if (playerIsVisible) {
+        this.combatStance = this._isAdjacentToCover()
+          ? "challenging"
+          : "aiming";
+      } else {
+        this.combatStance = "standing";
+        this._moveTowards(this.lastKnownPlayerPosition);
       }
     } else {
-      this.isAiming = false;
+      this.combatStance = "standing";
       this._pathfindToGoal();
     }
   }
 
-  _moveAlongPathTo(target) {
+  // --- NEW METHOD ---
+  _reloadWeapon() {
+    const weapon = this.getEquippedWeapon();
+    if (!weapon) return false;
+
+    const ammoNeeded = weapon.capacity - weapon.loaded;
+    if (ammoNeeded === 0) return false;
+
+    const ammoPouch = this.inventory.find((i) => i.type === "ammo");
+    if (!ammoPouch || ammoPouch.quantity <= 0) {
+      // Out of ammo entirely
+      return false;
+    }
+
+    const ammoToTransfer = Math.min(ammoNeeded, ammoPouch.quantity);
+    weapon.loaded += ammoToTransfer;
+    ammoPouch.quantity -= ammoToTransfer;
+
+    return true; // Successfully reloaded
+  }
+
+  respondToChallenge() {
+    // This is the player-initiated path.
+    // If the bandit is ducking, it decides whether to accept the Quickdraw.
+    if (this.combatStance === "ducking" && Math.random() > 0.3) {
+      this.combatStance = "challenging";
+    }
+  }
+
+  _getAngleToPlayer() {
+    const dx = this.game.player.x - this.x;
+    const dy = this.game.player.y - this.y;
+    return Math.atan2(dy, dx) * (180 / Math.PI);
+  }
+
+  _isAdjacentToCover() {
+    const coverTypes = [
+      TILE_TYPE.ROCK,
+      TILE_TYPE.WALL,
+      TILE_TYPE.CACTUS,
+      TILE_TYPE.SETTLEMENT_WALL,
+    ];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const tile = this.game.world.getTileAt(this.x + dx, this.y + dy);
+        if (coverTypes.includes(tile)) return true;
+      }
+    }
+    return false;
+  }
+
+  _moveTowards(target) {
+    const distanceToTarget = Math.hypot(this.x - target.x, this.y - target.y);
+    // --- THIS IS THE KEY CHANGE ---
+    // Stop moving if we are already at a good distance (5 tiles or closer).
+    if (distanceToTarget <= 5) {
+      // If we're not in cover, we'll just hold our ground for a turn before re-evaluating.
+      if (!this._isAdjacentToCover()) {
+        this.combatStance = "standing";
+      }
+      return;
+    }
+
     const passableCallback = (x, y) => {
       const tile = this.game.world.getTileAt(x, y);
       if (!terrainInfo[tile]?.isPassable) return false;
-
-      // The target tile (e.g., player's position) should be considered passable for pathfinding.
       if (x === target.x && y === target.y) return true;
-
-      // Don't path through other actors.
       return !this.game.isTileOccupied(x, y, this);
     };
     const astar = new ROT.Path.AStar(target.x, target.y, passableCallback, {
@@ -239,27 +295,21 @@ export class Bandit {
 
     if (path.length > 1) {
       const nextStep = path[1];
-      // Final check before moving to prevent collisions if actors move simultaneously.
       if (!this.game.isTileOccupied(nextStep.x, nextStep.y, this)) {
         this.x = nextStep.x;
         this.y = nextStep.y;
+        this.combatStance = "standing";
       }
+    } else if (this.x === target.x && this.y === target.y) {
+      this.lastKnownPlayerPosition = null;
     }
   }
-
   _pathfindToGoal() {
+    // This logic for non-combat movement remains the same
     const target = this.baseSettlement;
-
-    if (target) {
-      const distance = Math.hypot(this.x - target.x, this.y - target.y);
-      if (distance > 200) {
-        this._wanderRandomly();
-        return;
-      }
-      // Pathfind towards the assigned base settlement
-      this._moveAlongPathTo(target);
+    if (target && Math.hypot(this.x - target.x, this.y - target.y) < 200) {
+      this._moveTowards(target);
     } else {
-      // No base settlement, so wander randomly
       this._wanderRandomly();
     }
   }
@@ -270,30 +320,17 @@ export class Bandit {
       [1, 0],
       [0, -1],
       [0, 1],
-      [-1, -1],
-      [-1, 1],
-      [1, -1],
-      [1, 1],
     ];
-    const validMoves = [];
-
-    for (const move of moves) {
-      const newX = this.x + move[0];
-      const newY = this.y + move[1];
-      const tile = this.game.world.getTileAt(newX, newY);
-      if (
-        terrainInfo[tile]?.isPassable &&
-        !this.game.isTileOccupied(newX, newY, this)
-      ) {
-        validMoves.push(move);
-      }
-    }
-
-    if (validMoves.length > 0) {
-      const randomMove =
-        validMoves[Math.floor(Math.random() * validMoves.length)];
-      this.x += randomMove[0];
-      this.y += randomMove[1];
+    const move = moves[Math.floor(Math.random() * moves.length)];
+    const newX = this.x + move[0];
+    const newY = this.y + move[1];
+    const tile = this.game.world.getTileAt(newX, newY);
+    if (
+      terrainInfo[tile]?.isPassable &&
+      !this.game.isTileOccupied(newX, newY, this)
+    ) {
+      this.x = newX;
+      this.y = newY;
     }
   }
 

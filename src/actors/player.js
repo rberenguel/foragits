@@ -1,12 +1,11 @@
+// src/actors/player.js
 import { terrainInfo, TILE_TYPE } from "../terrain.js";
 import { createItem } from "../items.js";
 import { Shopkeeper } from "./shopkeeper.js";
 
 function getDirectionName(dx, dy) {
   if (dx === 0 && dy === 0) return "here";
-
   const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-
   if (angle > -22.5 && angle <= 22.5) return "east";
   if (angle > 22.5 && angle <= 67.5) return "south-east";
   if (angle > 67.5 && angle <= 112.5) return "south";
@@ -15,25 +14,24 @@ function getDirectionName(dx, dy) {
   if (angle > -157.5 && angle <= -112.5) return "north-west";
   if (angle > -112.5 && angle <= -67.5) return "north";
   if (angle > -67.5 && angle <= -22.5) return "north-east";
-
   return "a strange direction";
 }
 
 export class Player {
   constructor(game, x, y) {
+    this.name = "You";
     this.game = game;
     this.x = x;
     this.y = y;
     this.hp = 10;
-    this.ammo = 6;
     this.char = "@";
     this.color = "#773300";
-    this.isAiming = false;
-    this.aimAngle = 0;
-    this.isDucking = false;
-    this.aimError = 2; // Base accuracy
-
+    this.aimAngle = 0; // Still needed for direction
     this.money = 2;
+
+    // --- NEW STATE MACHINE ---
+    this.combatStance = "standing"; // 'standing', 'ducking', 'challenging'
+
     this.inventory = [
       createItem("revolver_rusty", { equipped: true }),
       createItem("ammo_bullet", { quantity: 18 }),
@@ -43,25 +41,313 @@ export class Player {
       createItem("boots_worn", { equipped: true }),
     ];
   }
+
   getEquippedWeapon() {
     return this.inventory.find((i) => i.type === "weapon" && i.equipped);
   }
+
   act() {
     this.game.engine.lock();
     window.addEventListener("keydown", this);
   }
+  isCorpse() {
+    return this.hp <= 0;
+  }
+  handleEvent(e) {
+    e.preventDefault();
+    let tookTurn = false;
+    const key = e.key;
+
+    // --- ANNOUNCEMENT / UI SCREENS (NO CHANGE) ---
+    if (this.game.gameState === "announcement") {
+      if (key === "f") this.game.gameState = "playing";
+      return;
+    }
+    if (this.game.gameState === "inventory") {
+      if (key === "i" || key === "Escape") this.game.toggleInventory();
+      return;
+    }
+    if (this.game.gameState === "map") {
+      if (key === "m" || key === "Escape") this.game.toggleMap();
+      return;
+    }
+    if (this.game.gameState === "shopping") {
+      if (key === "Escape") this.game.stopShopping();
+      return;
+    }
+    if (key === "?") {
+      this.game.toggleHelp();
+      return;
+    }
+    const isAimingStance =
+      this.combatStance === "aiming" || this.combatStance === "challenging";
+    // --- COMBAT AND MOVEMENT LOGIC ---
+    switch (key) {
+      case "ArrowUp":
+      case "ArrowDown":
+      case "ArrowLeft":
+      case "ArrowRight":
+        if (isAimingStance) {
+          this._updateAimAngle(key);
+          tookTurn = false; // Aiming adjustment does not take a turn
+        } else {
+          tookTurn = this._handleMovement(key);
+        }
+        break;
+      case "a":
+        tookTurn = this._toggleAim();
+        break;
+      case "d":
+        tookTurn = this._toggleDuck();
+        break;
+      case "f":
+        if (isAimingStance) {
+          tookTurn = this.game.playerFire(this);
+        }
+        break;
+      // ... (other keys like 'r', 'g', 't', 'u', 'l' are fine)
+      case "r":
+        tookTurn = this._reloadWeapon();
+        break;
+      case "g":
+        tookTurn = this._getItems();
+        break;
+      case "t":
+        tookTurn = this._talkToNPC();
+        break;
+      case "u":
+        tookTurn = this._useItem();
+        break;
+      case "l":
+        tookTurn = this._surveyArea();
+        break;
+      case "i":
+        this.game.toggleInventory();
+        break;
+      case "m":
+        this.game.toggleMap();
+        break;
+    }
+
+    if (tookTurn) {
+      this.game.renderer.drawAll(); // Draw at the end of a successful turn
+      window.removeEventListener("keydown", this);
+      this.game.engine.unlock();
+    } else if (isAimingStance) {
+      this.game.renderer.drawAll(); // Redraw for non-turn actions like aiming
+    }
+  }
+  _updateAimAngle(key) {
+    const keyMap = {
+      ArrowLeft: -5,
+      ArrowRight: 5,
+      ArrowUp: 0,
+      ArrowDown: 0, // Or handle up/down as fine-tuning if desired
+    };
+    let change = 0;
+    if (key === "ArrowLeft") change = -5;
+    if (key === "ArrowRight") change = 5;
+    this.aimAngle = (this.aimAngle + change + 360) % 360;
+    return this.aimAngle;
+  }
+  _toggleDuck() {
+    if (this.combatStance === "standing" || this.combatStance === "aiming") {
+      if (this._isAdjacentToCover()) {
+        this.combatStance = "ducking";
+        this.game.renderer.displayMessage("You duck behind cover.");
+        return true;
+      } else {
+        this.game.renderer.displayMessage("There is no cover here.");
+        return false;
+      }
+    } else {
+      // Was ducking or challenging
+      this.combatStance = "standing";
+      this.game.renderer.displayMessage("You stand up.");
+      return true;
+    }
+  }
+  _toggleAim() {
+    switch (this.combatStance) {
+      case "standing":
+        this.combatStance = "aiming";
+        this.game.renderer.displayMessage("You raise your weapon.");
+        break;
+      case "aiming":
+        this.combatStance = "standing";
+        this.game.renderer.displayMessage("You lower your weapon.");
+        break;
+      case "ducking":
+        this.combatStance = "challenging";
+        this.game.renderer.displayMessage("You take aim from behind cover...");
+        break;
+      case "challenging":
+        this.combatStance = "ducking";
+        this.game.renderer.displayMessage("You stand down.");
+        break;
+    }
+    return true; // Toggling aim always takes a turn
+  }
+  _toggleCover() {
+    if (this.combatStance === "standing") {
+      const hasCover = this._isAdjacentToCover();
+      if (hasCover) {
+        this.combatStance = "ducking";
+        this.game.renderer.displayMessage("You duck behind cover.");
+      } else {
+        this.game.renderer.displayMessage("There is no cover here.");
+        return false;
+      }
+    } else {
+      // Was 'ducking' or 'challenging'
+      this.combatStance = "standing";
+      this.game.renderer.displayMessage("You stand up.");
+    }
+    this.game.renderer.drawAll();
+    return true;
+  }
+
+  _toggleChallenge() {
+    if (this.combatStance === "ducking") {
+      this.combatStance = "challenging";
+      this.game.renderer.displayMessage(
+        "You take aim from behind your cover...",
+      );
+    } else if (this.combatStance === "challenging") {
+      this.combatStance = "ducking";
+      this.game.renderer.displayMessage("You stand down.");
+    } else {
+      return false; // Can't challenge from 'standing'
+    }
+    this.game.renderer.drawAll();
+    return true; // Taking a stance takes a turn
+  }
+  _getAngleToPlayer() {
+    // For the player, this is just their current aim angle.
+    // This provides a consistent interface for the renderer.
+    return this.aimAngle;
+  }
+
+  _handleMovement(key) {
+    const keyMap = {
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+    };
+    if (!(key in keyMap)) return false;
+
+    const { x: dx, y: dy } = keyMap[key];
+    const newX = this.x + dx;
+    const newY = this.y + dy;
+
+    const tileChar = this.game.world.getTileAt(newX, newY);
+    if (!terrainInfo[tileChar]?.isPassable) return false;
+
+    this.x = newX;
+    this.y = newY;
+    this.combatStance = "standing"; // Moving always makes you stand
+    this._checkForGroundMessages();
+    this.game.renderer.drawAll();
+    return true;
+  }
+
+  _isAdjacentToCover() {
+    const coverTypes = [
+      TILE_TYPE.ROCK,
+      TILE_TYPE.WALL,
+      TILE_TYPE.CACTUS,
+      TILE_TYPE.SETTLEMENT_WALL,
+    ];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const tile = this.game.world.getTileAt(this.x + dx, this.y + dy);
+        if (coverTypes.includes(tile)) return true;
+      }
+    }
+    return false;
+  }
+
+  _checkForGroundMessages() {
+    // Check for corpses, items, and placards
+    const actors = [...this.game.enemies, ...this.game.npcs];
+    const corpse = actors.find(
+      (a) => a.x === this.x && a.y === this.y && a.isCorpse(),
+    );
+    if (corpse) {
+      const settlementName =
+        corpse.baseSettlement?.name ||
+        corpse.homeSettlement?.name ||
+        "the dusty plains";
+      this.game.renderer.displayMessage(
+        `Here lies ${corpse.name} from ${settlementName}.`,
+      );
+      return;
+    }
+
+    const itemKey = `${this.x},${this.y}`;
+    const items = this.game.world.itemsOnGround.get(itemKey);
+    if (items && items.length > 0) {
+      this.game.renderer.displayMessage(
+        `You see here ${items.map((i) => i.name).join(", ")}.`,
+      );
+      return;
+    }
+
+    const placard = this.game.world.placardMap.get(itemKey);
+    if (placard) {
+      this.game.renderer.displayMessage(`You see a sign: "${placard.name}"`);
+    }
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    this.combatStance = "standing"; // Getting hit makes you stand up
+    this.game.renderer.flashScreen();
+    this.game.renderer.drawAll();
+    if (this.hp <= 0) this.game.gameOver();
+  }
+
+  // Other methods like _reloadWeapon, _getItems, _talkToNPC, _useItem, _surveyArea are mostly unchanged
+  // but ensure they return true/false correctly. Example:
+  _reloadWeapon() {
+    const weapon = this.getEquippedWeapon();
+    if (!weapon) {
+      this.game.renderer.displayMessage("You don't have a weapon equipped.");
+      return false;
+    }
+    const ammoNeeded = weapon.capacity - weapon.loaded;
+    if (ammoNeeded === 0) {
+      this.game.renderer.displayMessage(
+        `${weapon.name} is already fully loaded.`,
+      );
+      return false;
+    }
+    const ammoPouch = this.inventory.find((i) => i.type === "ammo");
+    const ammoAvailable = ammoPouch ? ammoPouch.quantity : 0;
+    if (ammoAvailable === 0) {
+      this.game.renderer.displayMessage("You have no ammunition.");
+      return false;
+    }
+    const ammoToTransfer = Math.min(ammoNeeded, ammoAvailable);
+    weapon.loaded += ammoToTransfer;
+    ammoPouch.quantity -= ammoToTransfer;
+    this.game.renderer.displayMessage(`You reload the ${weapon.name}.`);
+    this.game.renderer.drawAll();
+    return true;
+  }
+
   _getItems() {
     const itemKey = `${this.x},${this.y}`;
     const itemsOnTile = this.game.world.itemsOnGround.get(itemKey);
-
     if (!itemsOnTile || itemsOnTile.length === 0) {
       this.game.renderer.displayMessage("There is nothing here to pick up.");
-      return false; // Does not take a turn
+      return false;
     }
-
+    // ... (rest of the logic is fine)
     let itemsPickedUp = [];
     let moneyFound = 0;
-
     for (const item of itemsOnTile) {
       if (item.type === "money") {
         moneyFound += item.quantity;
@@ -79,7 +365,6 @@ export class Player {
         itemsPickedUp.push(item.name);
       }
     }
-
     let message = "You pick up ";
     if (itemsPickedUp.length > 0) {
       message += `the ${itemsPickedUp.join(", ")}`;
@@ -88,321 +373,22 @@ export class Player {
       if (itemsPickedUp.length > 0) {
         message += " and ";
       }
-      message += `${moneyFound}`;
+      message += `$${moneyFound}`;
     }
     message += ".";
-
     this.game.renderer.displayMessage(message);
     this.game.world.itemsOnGround.delete(itemKey);
-
-    // Redraw immediately to remove items from map
     this.game.renderer.drawAll();
-    return true; // Takes a turn
-  }
-  handleEvent(e) {
-    e.preventDefault();
-    let tookTurn = false;
-    const code = e.keyCode;
-    const key = e.key;
-    if (code === ROT.KEYS.VK_R) {
-      return this._reloadWeapon();
-    }
-    if (code === ROT.KEYS.VK_G) {
-      return this._getItems();
-    }
-    if (code === ROT.KEYS.VK_A) {
-      this.isAiming = !this.isAiming;
-      if (this.isAiming) {
-        const building = this.game.world.getBuildingAt(this.x, this.y);
-        if (building && building.isShop) {
-          const shopkeeper = this.game.npcs.find(
-            (n) =>
-              n instanceof Shopkeeper &&
-              n.homeSettlement.name === building.settlementName,
-          );
-          if (shopkeeper) {
-            shopkeeper.isHostile = true;
-            this.game.renderer.displayMessage(
-              "The shopkeeper draws a shotgun!",
-            );
-          }
-        }
-      }
-      this.game.renderer.drawAll();
-      return;
-    }
-    if (code === ROT.KEYS.VK_L) {
-      this._surveyArea();
-      tookTurn = true;
-    }
-    if (this.gameState === "map") {
-      if (code === ROT.KEYS.VK_M || code === ROT.KEYS.VK_ESCAPE)
-        this.game.toggleMap();
-      return;
-    }
-    if (this.game.gameState === "inventory") {
-      if (code === ROT.KEYS.VK_I || code === ROT.KEYS.VK_ESCAPE) {
-        this.game.toggleInventory();
-      }
-      return; // Do nothing else while in inventory
-    }
-    if (this.game.gameState === "shopping") {
-      if (code === ROT.KEYS.VK_ESCAPE) {
-        this.game.stopShopping();
-        return;
-      }
-      // TODO: Handle buying items
-      return;
-    }
-    if (this.game.gameState === "announcement") {
-      if (key === "f") {
-        this.game.gameState = "playing";
-      }
-      // No turn taken, just acknowledging the message
-      return;
-    }
-    // Somehow ROT.KEYS.VK_QUESTION_MARK does not match this
-    if (e.key === "?") {
-      this.game.toggleHelp();
-      return;
-    }
-    // --- REGULAR 'PLAYING' STATE INPUT ---
-    if (key === "?" || code === ROT.KEYS.VK_I || code === ROT.KEYS.VK_M) {
-      if (key === "?") this.game.toggleHelp();
-      if (code === ROT.KEYS.VK_I) this.game.toggleInventory();
-      if (code === ROT.KEYS.VK_M) this.game.toggleMap();
-      return;
-    }
-    if (key === "u") {
-      tookTurn = this._useItem();
-    }
-    if (key === "d") {
-      tookTurn = this._toggleDuck();
-    }
-    if (key === "t") {
-      tookTurn = this._talkToNPC();
-    }
-
-    if (this.isAiming) {
-      tookTurn = this._handleAimingInput(code);
-    } else {
-      tookTurn = this._handleMovementInput(code);
-    }
-
-    if (tookTurn) {
-      window.removeEventListener("keydown", this);
-      this.game.engine.unlock();
-    }
-  }
-  _surveyArea() {
-    const surveyRadius = 250; // How far the player can "see" settlements
-    // We only need the single nearest settlement for the message
-    const nearbySettlements = this.game.world.findNearbySettlements(
-      this.x,
-      this.y,
-      1,
-    );
-
-    if (
-      nearbySettlements.length > 0 &&
-      nearbySettlements[0].distance < surveyRadius
-    ) {
-      const nearest = nearbySettlements[0];
-      const dx = nearest.x - this.x;
-      const dy = nearest.y - this.y;
-      const direction = getDirectionName(dx, dy);
-      const distance = Math.abs(dx) + Math.abs(dy) > 100 ? "far" : "near";
-      this.game.renderer.displayMessage(
-        `You scan the horizon. You glimpse what looks like a settlement ${distance} to the ${direction}.`,
-      );
-    } else {
-      this.game.renderer.displayMessage(
-        "You see nothing but endless desert in all directions.",
-      );
-    }
-
-    return true; // Surveying takes a turn
-  }
-  _reloadWeapon() {
-    const weapon = this.getEquippedWeapon();
-    if (!weapon) {
-      this.game.renderer.displayMessage("You don't have a weapon equipped.");
-      return false;
-    }
-
-    const ammoNeeded = weapon.capacity - weapon.loaded;
-    if (ammoNeeded === 0) {
-      this.game.renderer.displayMessage(
-        `${weapon.name} is already fully loaded.`,
-      );
-      return false;
-    }
-
-    const ammoPouch = this.inventory.find((i) => i.type === "ammo");
-    const ammoAvailable = ammoPouch ? ammoPouch.quantity : 0;
-    if (ammoAvailable === 0) {
-      this.game.renderer.displayMessage("You have no ammunition.");
-      return false;
-    }
-
-    const ammoToTransfer = Math.min(ammoNeeded, ammoAvailable);
-    weapon.loaded += ammoToTransfer;
-    ammoPouch.quantity -= ammoToTransfer;
-
-    this.game.renderer.displayMessage(`You reload the ${weapon.name}.`);
-    this.game.renderer.updateUI(); // Immediately show updated ammo
-    return true; // Reloading takes a turn
-  }
-  takeDamage(amount) {
-    this.hp -= amount;
-    this.game.renderer.updateUI();
-    this.game.renderer.flashScreen();
-    if (this.hp <= 0) this.game.gameOver();
-  }
-
-  _handleAimingInput(code) {
-    // Aiming adjustment does not take a turn
-    if (code === ROT.KEYS.VK_LEFT || code === ROT.KEYS.VK_RIGHT) {
-      let change = code === ROT.KEYS.VK_LEFT ? -5 : 5;
-      this.aimAngle = (this.aimAngle + change + 360) % 360;
-      this.game.renderer.drawAll();
-      return false;
-    }
-    // Firing takes a turn (or fails)
-    if (code === ROT.KEYS.VK_F) {
-      return this._fireShot();
-    }
-    return false;
-  }
-
-  _handleMovementInput(code) {
-    const keyMap = {
-      [ROT.KEYS.VK_UP]: { x: 0, y: -1 },
-      [ROT.KEYS.VK_DOWN]: { x: 0, y: 1 },
-      [ROT.KEYS.VK_LEFT]: { x: -1, y: 0 },
-      [ROT.KEYS.VK_RIGHT]: { x: 1, y: 0 },
-    };
-    if (!(code in keyMap)) return false;
-
-    const { x: dx, y: dy } = keyMap[code];
-    const newX = this.x + dx;
-    const newY = this.y + dy;
-
-    const tileChar = this.game.world.getTileAt(newX, newY);
-    const info = terrainInfo[tileChar];
-    if (!info?.isPassable) return false;
-
-    this.x = newX;
-    this.y = newY;
-    this.isDucking = false; // Moving cancels ducking
-    const actors = [...this.game.enemies, ...this.game.npcs];
-    const corpse = actors.find(
-      (e) => e.x === this.x && e.y === this.y && e.isCorpse(),
-    );
-    if (corpse) {
-      const actorName = corpse.name || "an unnamed soul";
-      const settlementName =
-        corpse.baseSettlement?.name ||
-        corpse.homeSettlement?.name ||
-        "the dusty plains";
-      const message = `Here lies ${actorName} from ${settlementName}.`;
-      this.game.renderer.displayMessage(message);
-    }
-    this._checkForPlacard();
-    this._checkForItemsOnGround();
-
-    this.game.renderer.drawAll();
-    this.game.renderer.updateUI();
     return true;
   }
-  _checkForItemsOnGround() {
-    const itemKey = `${this.x},${this.y}`;
-    const itemsOnTile = this.game.world.itemsOnGround.get(itemKey);
 
-    if (itemsOnTile && itemsOnTile.length > 0) {
-      this.game.renderer.displayMessage(
-        `You see here ${itemsOnTile.map((i) => i.name).join(", ")}.`,
-      );
-    }
-  }
-  _checkForPlacard() {
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        if (dx === 0 && dy === 0) continue;
-
-        const tileX = this.x + dx;
-        const tileY = this.y + dy;
-        const tile = this.game.world.getTileAt(tileX, tileY);
-
-        if (tile === "팻") {
-          const settlement = this.game.world.placardMap.get(
-            `${tileX},${tileY}`,
-          );
-          if (settlement) {
-            this.game.renderer.displayMessage(
-              `You see a sign: "${settlement.name}"`,
-            );
-          }
-        }
-      }
-    }
-  }
-
-  _fireShot() {
-    const weapon = this.getEquippedWeapon();
-    if (!weapon || weapon.loaded <= 0) {
-      this.game.renderer.displayMessage("Click.");
-      return false; // Firing with no ammo does NOT take a turn
-    }
-
-    weapon.loaded--; // Consume one round
-    this.game.renderer.updateUI(); // Update immediately
-
-    // Check for misfire
-    if (Math.random() < (weapon.misfireChance || 0)) {
-      this.game.renderer.displayMessage(`Your ${weapon.name} misfired!`);
-      this.isAiming = false;
-      this.game.renderer.drawAll();
-      return true; // Misfire takes a turn
-    }
-
-    const wasDucking = this.isDucking;
-    if (wasDucking) {
-      this.isDucking = false;
-      this.game.renderer.drawAll(); // Redraw to get the "glimpse"
-    }
-
-    // Calculate accuracy deviation
-    const totalError = (this.aimError || 0) + (weapon.aimError || 0);
-    const deviation = (Math.random() - 0.5) * totalError;
-    const finalAngle = this.aimAngle + deviation;
-
-    this.game.resolveShot(this, finalAngle);
-
-    this.isAiming = false;
-
-    if (wasDucking) {
-      setTimeout(() => {
-        this.isDucking = true;
-        this.game.renderer.drawAll();
-        this.game.renderer.updateUI();
-      }, 100); // 100ms delay for the glimpse
-    } else {
-      // If not ducking, just redraw normally to remove aim line etc.
-      this.game.renderer.drawAll();
-    }
-
-    return true; // A successful shot takes a turn
-  }
   _talkToNPC() {
-    let talked = false;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         if (dx === 0 && dy === 0) continue;
-        const tileX = this.x + dx;
-        const tileY = this.y + dy;
-
-        const npc = this.game.npcs.find((n) => n.x === tileX && n.y === tileY);
+        const npc = this.game.npcs.find(
+          (n) => n.x === this.x + dx && n.y === this.y + dy,
+        );
         if (npc) {
           if (npc instanceof Shopkeeper) {
             this.game.startShopping(npc);
@@ -411,111 +397,78 @@ export class Player {
               `"${npc.getNextDialogue()}" -${npc.name}`,
             );
           }
-          talked = true;
-          break;
+          return true;
         }
       }
-      if (talked) break;
     }
-
-    if (!talked) {
-      this.game.renderer.displayMessage("There's no one here to talk to.");
-    }
-    return talked; // Talking takes a turn if successful
-  }
-  _toggleDuck() {
-    if (this.isDucking) {
-      this.isDucking = false;
-      this.game.renderer.displayMessage("You pop up from behind cover.");
-      this.game.renderer.drawAll();
-      return true; // Takes a turn to stand up
-    }
-
-    // Check for adjacent cover
-    let hasCover = false;
-    const coverTypes = [TILE_TYPE.ROCK];
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        if (dx === 0 && dy === 0) continue;
-        const tileX = this.x + dx;
-        const tileY = this.y + dy;
-        const tile = this.game.world.getTileAt(tileX, tileY);
-        if (coverTypes.includes(tile)) {
-          hasCover = true;
-          break;
-        }
-      }
-      if (hasCover) break;
-    }
-
-    if (hasCover) {
-      this.isDucking = true;
-      this.isAiming = false; // Can't aim while fully ducked
-      this.game.renderer.displayMessage("You duck behind cover.");
-      this.game.renderer.drawAll();
-      return true; // Takes a turn
-    } else {
-      this.game.renderer.displayMessage("There is no cover here.");
-      return false; // No turn
-    }
+    this.game.renderer.displayMessage("There's no one here to talk to.");
+    return false;
   }
   _useItem() {
-    // 1. Find adjacent fire pit
     let firePitCoords = null;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         if (dx === 0 && dy === 0) continue;
         const tileX = this.x + dx;
         const tileY = this.y + dy;
-        const tile = this.game.world.getTileAt(tileX, tileY);
-        if (tile === TILE_TYPE.FIRE_PIT_INACTIVE) {
+        if (
+          this.game.world.getTileAt(tileX, tileY) ===
+          TILE_TYPE.FIRE_PIT_INACTIVE
+        ) {
           firePitCoords = { x: tileX, y: tileY };
           break;
         }
       }
       if (firePitCoords) break;
     }
-
     if (!firePitCoords) {
       this.game.renderer.displayMessage("You are not near a fire pit.");
-      return false; // No turn taken
+      return false;
     }
-
-    // 2. Find beans in inventory
     const beanIndex = this.inventory.findIndex(
       (i) => i.templateId === "can_of_beans",
     );
-    const beans = this.inventory[beanIndex];
-
-    if (!beans) {
-      this.game.renderer.displayMessage(
-        "You have nothing to cook on the fire.",
-      );
+    if (beanIndex === -1) {
+      this.game.renderer.displayMessage("You have nothing to cook.");
       return false;
     }
-
-    // NEW: Check if player is already at full health
     if (this.hp >= 10) {
       this.game.renderer.displayMessage("You are already at full health.");
-      return false; // No turn taken
+      return false;
     }
-
-    // 3. Use the item
-    this.hp = Math.min(10, this.hp + beans.heals); // Assuming max HP is 10
-
-    // 4. Decrement or remove item
+    const beans = this.inventory[beanIndex];
+    this.hp = Math.min(10, this.hp + beans.heals);
     if (beans.quantity > 1) {
       beans.quantity--;
     } else {
       this.inventory.splice(beanIndex, 1);
     }
-
-    // 5. Give feedback
     this.game.renderer.displayMessage(
       "You warm a can of beans by the fire. You feel better.",
     );
-    this.game.renderer.updateUI();
-
-    return true; // Turn taken
+    this.game.renderer.drawAll();
+    return true;
+  }
+  _surveyArea() {
+    const nearbySettlements = this.game.world.findNearbySettlements(
+      this.x,
+      this.y,
+      1,
+    );
+    if (nearbySettlements.length > 0 && nearbySettlements[0].distance < 250) {
+      const nearest = nearbySettlements[0];
+      const dx = nearest.x - this.x;
+      const dy = nearest.y - this.y;
+      const direction = getDirectionName(dx, dy);
+      const distance = Math.hypot(dx, dy) > 100 ? "far" : "near";
+      this.game.renderer.displayMessage(
+        `You scan the horizon. You glimpse what looks like a settlement ${distance} to the ${direction}.`,
+      );
+    } else {
+      this.game.renderer.displayMessage(
+        "You see nothing but endless desert in all directions.",
+      );
+    }
+    return true;
   }
 }
