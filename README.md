@@ -43,7 +43,7 @@ You can find settlements populated by townsfolk (`P`). One building in each sett
 
 #### Cover System
 
-You can press `d` to duck behind an adjacent rock for cover. This takes a turn. While ducking, you are protected from incoming shots, but your vision is limited. Press `d` again or move to stand up. You can fire from cover by aiming (`a`) and then firing (`f`), which gives you a brief glimpse of the area as you shoot.
+You can press `d` to duck behind an adjacent rock for cover. This takes a turn. While ducking, you are protected from incoming shots, but your vision is limited. Press `d` again or move to stand up. You can fire from cover by aiming (`a`) and then firing (`f`), which gives you a brief glimpse of the area as you shoot. If you are being aimed at by a bandit, you can be shot… Whoever is faster wins!
 
 #### Survival
 
