@@ -256,7 +256,13 @@ export class Bandit {
     const coverTypes = [
       TILE_TYPE.ROCK,
       TILE_TYPE.WALL,
+      // TODO: Should be for all actors
       TILE_TYPE.CACTUS,
+      TILE_TYPE.CACTUS_2,
+      TILE_TYPE.CACTUS_3,
+      TILE_TYPE.WATER_TROUGH,
+      TILE_TYPE.CRATE,
+      TILE_TYPE.BARREL,
       TILE_TYPE.SETTLEMENT_WALL,
     ];
     for (let dx = -1; dx <= 1; dx++) {

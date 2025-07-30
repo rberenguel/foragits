@@ -82,7 +82,7 @@ export class NPC {
     this.game = game;
     this.x = x;
     this.y = y;
-    this.hp = 1; // Not really used for combat
+    this.hp = 3;
     this.char = "P";
     this.color = "#3498db";
     this.name = generateNpcName();
@@ -96,6 +96,13 @@ export class NPC {
     this.dialogues =
       dialogueSets[Math.floor(Math.random() * dialogueSets.length)];
     this.dialogueIndex = 0;
+  }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    if (this.hp <= 0) {
+      this.game.killEnemy(this); // Re-use the kill logic for bandits
+    }
   }
 
   getNextDialogue() {

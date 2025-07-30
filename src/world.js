@@ -1,6 +1,6 @@
 import { CHUNK_WIDTH, CHUNK_HEIGHT, SETTLEMENT_RADIUS } from "./constants.js";
 import { Settlement } from "./features/settlement.js";
-import { TILE_TYPE } from "./terrain.js";
+import { terrainInfo, TILE_TYPE } from "./terrain.js";
 import { NPC } from "./actors/npc.js";
 import { Shopkeeper } from "./actors/shopkeeper.js";
 
@@ -15,6 +15,7 @@ export class World {
     this.settlements = new Map();
     this.placardMap = new Map();
     this.itemsOnGround = new Map();
+    this.terrainHealth = new Map();
   }
   isSettlementTile(x, y) {
     const metaX = Math.floor(x / (CHUNK_WIDTH * META_CHUNK_SIZE));
@@ -149,6 +150,10 @@ export class World {
     if (settlement) {
       if (!settlement.isPopulated) {
         this._populateSettlement(settlement);
+      }
+      if (!settlement.areDetailsGenerated) {
+        settlement.generateDetails(this);
+        settlement.areDetailsGenerated = true;
       }
       // --- REVISED PLACARD AND SETTLEMENT LOGIC ---
 
@@ -313,5 +318,46 @@ export class World {
       }
     }
     return null;
+  }
+
+  isPassable(x, y) {
+    const tile = this.getTileAt(x, y);
+    return terrainInfo[tile].isPassable;
+  }
+
+  setTile(worldX, worldY, tile) {
+    const chunkX = Math.floor(worldX / CHUNK_WIDTH);
+    const chunkY = Math.floor(worldY / CHUNK_HEIGHT);
+    const localX = ((worldX % CHUNK_WIDTH) + CHUNK_WIDTH) % CHUNK_WIDTH;
+    const localY = ((worldY % CHUNK_HEIGHT) + CHUNK_HEIGHT) % CHUNK_HEIGHT;
+    const chunkKey = `${chunkX},${chunkY}`;
+
+    if (!this.chunks[chunkKey]) {
+      this._generateChunk(chunkX, chunkY);
+    }
+    this.chunks[chunkKey][`${localX},${localY}`] = tile;
+  }
+
+  damageTerrain(x, y, amount) {
+    const key = `${x},${y}`;
+    const tile = this.getTileAt(x, y);
+    const info = terrainInfo[tile];
+
+    if (!info || !info.health) {
+      return; // Not destructible
+    }
+
+    let currentHealth = this.terrainHealth.get(key);
+    if (currentHealth === undefined) {
+      currentHealth = info.health;
+    }
+
+    currentHealth -= amount;
+    this.terrainHealth.set(key, currentHealth);
+
+    if (currentHealth <= 0) {
+      this.setTile(x, y, TILE_TYPE.FLOOR);
+      this.terrainHealth.delete(key);
+    }
   }
 }

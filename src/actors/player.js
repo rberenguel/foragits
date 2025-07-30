@@ -257,13 +257,33 @@ export class Player {
       TILE_TYPE.ROCK,
       TILE_TYPE.WALL,
       TILE_TYPE.CACTUS,
+      TILE_TYPE.CACTUS_2,
+      TILE_TYPE.CACTUS_3,
       TILE_TYPE.SETTLEMENT_WALL,
+      TILE_TYPE.WATER_TROUGH,
+      TILE_TYPE.CRATE,
+      TILE_TYPE.BARREL,
     ];
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         if (dx === 0 && dy === 0) continue;
-        const tile = this.game.world.getTileAt(this.x + dx, this.y + dy);
-        if (coverTypes.includes(tile)) return true;
+        const checkX = this.x + dx;
+        const checkY = this.y + dy;
+        const tile = this.game.world.getTileAt(checkX, checkY);
+
+        if (coverTypes.includes(tile)) {
+          // If it's a destructible type, make sure it's not already destroyed
+          const info = terrainInfo[tile];
+          if (info && info.health) {
+            const health = this.game.world.terrainHealth.get(
+              `${checkX},${checkY}`,
+            );
+            if (health !== undefined && health <= 0) {
+              continue; // This specific object is destroyed, so it's not cover.
+            }
+          }
+          return true; // It's valid cover
+        }
       }
     }
     return false;

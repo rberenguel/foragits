@@ -78,4 +78,12 @@ export class Shopkeeper {
   isCorpse() {
     return this.hp <= 0;
   }
+
+  takeDamage(amount) {
+    this.hp -= amount;
+    this.isHostile = true; // Fight back!
+    if (this.hp <= 0) {
+      this.game.killEnemy(this);
+    }
+  }
 }

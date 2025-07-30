@@ -60,7 +60,12 @@ export class Renderer {
             TILE_TYPE.ROCK,
             TILE_TYPE.WALL,
             TILE_TYPE.CACTUS,
+            TILE_TYPE.CACTUS_2,
+            TILE_TYPE.CACTUS_3,
             TILE_TYPE.SETTLEMENT_WALL,
+            TILE_TYPE.WATER_TROUGH,
+            TILE_TYPE.CRATE,
+            TILE_TYPE.BARREL,
           ];
           // If it's a cover tile, it blocks vision while ducking
           if (coverTypes.includes(tile)) {

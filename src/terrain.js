@@ -14,6 +14,12 @@ export const TILE_TYPE = {
   PLACARD: "팻",
   FIRE_PIT_INACTIVE: "~",
   ROCK: "o",
+  WATER_TROUGH: "U",
+  CRATE: "⌧",
+  BARREL: "◎",
+  FENCE_H: "─",
+  FENCE_V: "│",
+  FENCE_POST: "┼",
 };
 
 export const terrainInfo = {
@@ -34,18 +40,21 @@ export const terrainInfo = {
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
+    health: 15,
     color: "#2E8B57",
   },
   [TILE_TYPE.CACTUS_2]: {
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
+    health: 15,
     color: "#2E8B57",
   },
   [TILE_TYPE.CACTUS_3]: {
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
+    health: 15,
     color: "#2E8B57",
   },
   [TILE_TYPE.SHRUB]: {
@@ -95,5 +104,44 @@ export const terrainInfo = {
     isTransparent: true,
     isBulletPassable: true,
     color: "#8d8d8d",
+  },
+  [TILE_TYPE.WATER_TROUGH]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    health: 30,
+    color: "#4682B4",
+  },
+  [TILE_TYPE.CRATE]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    health: 4,
+    color: "#8B4513",
+  },
+  [TILE_TYPE.BARREL]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    health: 8,
+    color: "#8B4513",
+  },
+  [TILE_TYPE.FENCE_H]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    color: "#A0522D",
+  },
+  [TILE_TYPE.FENCE_V]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    color: "#A0522D",
+  },
+  [TILE_TYPE.FENCE_POST]: {
+    isPassable: true,
+    isTransparent: true,
+    isBulletPassable: true,
+    color: "#A0522D",
   },
 };

@@ -401,6 +401,7 @@ class Game {
       const tile = this.world.getTileAt(point.x, point.y);
       const info = terrainInfo[tile];
       if (info && !info.isBulletPassable) {
+        this.world.damageTerrain(point.x, point.y, 1); // Damage the terrain
         const cactusTypes = [
           TILE_TYPE.CACTUS,
           TILE_TYPE.CACTUS_2,
