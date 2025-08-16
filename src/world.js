@@ -82,7 +82,7 @@ export class World {
     ROT.RNG.setSeed(rngSeed);
 
     if (ROT.RNG.getUniform() > SETTLEMENT_CHANCE) {
-      this.settlements.set(metaKey, null);
+      //this.settlements.set(metaKey, null); // DO NOT CACHE FAILURES
       return null;
     }
 

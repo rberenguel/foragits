@@ -150,12 +150,17 @@ canvas[style*="z-index: 2"] {
 }
 
 #info-box {
-  background-color: #222;
-  padding: 5px 10px;
-  border-radius: 3px;
-  margin-top: 5px;
-  width: 1260px;
-  box-sizing: border-box;
-  min-height: 1.5em;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  background-color: rgba(30, 30, 30, 0.9);
   color: #ccc;
+  z-index: 250;
+  border: 1px solid #888;
+  padding: 10px;
+  border-radius: 5px;
+  box-sizing: border-box;
+  text-align: center;
 }
