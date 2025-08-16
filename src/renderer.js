@@ -142,6 +142,9 @@ export class Renderer {
     this.display.drawText(2, 1, "SHOP IS OPEN - WIP");
   }
   drawAll() {
+    const infoBox = document.getElementById("info-box");
+    infoBox.classList.add("hidden");
+
     if (this.game.gameState === "inventory") {
       this._drawInventoryScreen();
       return;
@@ -413,8 +416,18 @@ export class Renderer {
         this.particleCtx.lineWidth = 2;
         this.particleCtx.strokeRect(x, y, this.cellWidth, this.cellHeight);
 
-        const infoText = this._getInfoForTile(infoCursor.x, infoCursor.y);
-        this.displayMessage(infoText);
+        const info = this._getInfoForTile(infoCursor.x, infoCursor.y);
+        this.displayMessage(info.name);
+
+        const infoBox = document.getElementById("info-box");
+        if (info.description) {
+            infoBox.textContent = info.description;
+            infoBox.classList.remove("hidden");
+        } else {
+            infoBox.textContent = "";
+            infoBox.classList.add("hidden");
+        }
+
     } else {
         this.displayMessage("Cursor is outside the visible area.");
     }
@@ -423,34 +436,34 @@ export class Renderer {
   _getInfoForTile(x, y) {
     const key = `${x},${y}`;
     if (!this.visibleTiles.has(key) && !this.exploredTiles.has(key)) {
-      return "You don't know what is there.";
+      return { name: "You don't know what is there." };
     }
 
     // Check for actors
     const actors = [this.game.player, ...this.game.enemies, ...this.game.npcs];
     const actor = actors.find(a => a.x === x && a.y === y && !a.isCorpse());
     if (actor) {
-      return `You see ${actor.name}.`;
+      return { name: `You see ${actor.name}.` };
     }
     const corpse = actors.find(a => a.x === x && a.y === y && a.isCorpse());
     if (corpse) {
-        return `The corpse of ${corpse.name}.`;
+        return { name: `The corpse of ${corpse.name}.` };
     }
 
     // Check for items
     const items = this.game.world.itemsOnGround.get(key);
     if (items && items.length > 0) {
-      return `You see ${items.map(i => i.name).join(", ")}.`;
+      return { name: `You see ${items.map(i => i.name).join(", ")}.` };
     }
 
     // Check for terrain
     const tile = this.game.world.getTileAt(x, y);
     const info = terrainInfo[tile];
     if (info) {
-      return `You see ${info.name}.`;
+      return { name: `You see ${info.name}.`, description: info.description };
     }
 
-    return "You see nothing special.";
+    return { name: "You see nothing special." };
   }
 
   _drawAimLines() {

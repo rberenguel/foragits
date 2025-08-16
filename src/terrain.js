@@ -24,6 +24,7 @@ export const TILE_TYPE = {
 
 export const terrainInfo = {
   [TILE_TYPE.FLOOR]: {
+    name: "sand",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
@@ -31,12 +32,15 @@ export const terrainInfo = {
     darkColor: "#423e37",
   },
   [TILE_TYPE.WALL]: {
+    name: "a sturdy wall",
     isPassable: false,
     isTransparent: false,
     isBulletPassable: false,
     color: "#8B4513",
   },
   [TILE_TYPE.CACTUS]: {
+    name: "a saguaro cactus",
+    description: "A tall cactus. You can duck behind it for cover. Aiming from cover might give you an edge.",
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
@@ -44,6 +48,8 @@ export const terrainInfo = {
     color: "#2E8B57",
   },
   [TILE_TYPE.CACTUS_2]: {
+    name: "a prickly pear cactus",
+    description: "Provides good cover from gunfire.",
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
@@ -51,6 +57,7 @@ export const terrainInfo = {
     color: "#2E8B57",
   },
   [TILE_TYPE.CACTUS_3]: {
+    name: "a barrel cactus",
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
@@ -58,54 +65,63 @@ export const terrainInfo = {
     color: "#2E8B57",
   },
   [TILE_TYPE.SHRUB]: {
+    name: "a tough shrub",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#556B2F",
   },
   [TILE_TYPE.SHRUB_2]: {
+    name: "a sagebrush",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#6B8E23",
   },
   [TILE_TYPE.SHRUB_3]: {
+    name: "a creosote bush",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#8FBC8F",
   },
   [TILE_TYPE.SETTLEMENT_WALL]: {
+    name: "a settlement wall",
     isPassable: false,
     isTransparent: false,
     isBulletPassable: false,
     color: "#A9A9A9",
   },
   [TILE_TYPE.DOOR]: {
+    name: "a wooden door",
     isPassable: true,
     isTransparent: false, // Blocks line of sight
     isBulletPassable: true, // But not bullets
     color: "#A0522D",
   },
   [TILE_TYPE.PLACARD]: {
+    name: "a wooden sign",
     isPassable: false,
     isTransparent: true,
     isBulletPassable: true,
     color: "#8B4513",
   },
   [TILE_TYPE.FIRE_PIT_INACTIVE]: {
+    name: "an inactive fire pit",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#706f6f",
   },
   [TILE_TYPE.ROCK]: {
+    name: "a rock",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#8d8d8d",
   },
   [TILE_TYPE.WATER_TROUGH]: {
+    name: "a water trough",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
@@ -113,6 +129,7 @@ export const terrainInfo = {
     color: "#4682B4",
   },
   [TILE_TYPE.CRATE]: {
+    name: "a wooden crate",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
@@ -120,6 +137,7 @@ export const terrainInfo = {
     color: "#8B4513",
   },
   [TILE_TYPE.BARREL]: {
+    name: "a barrel",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
@@ -127,18 +145,21 @@ export const terrainInfo = {
     color: "#8B4513",
   },
   [TILE_TYPE.FENCE_H]: {
+    name: "a wooden fence",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#A0522D",
   },
   [TILE_TYPE.FENCE_V]: {
+    name: "a wooden fence",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
     color: "#A0522D",
   },
   [TILE_TYPE.FENCE_POST]: {
+    name: "a fence post",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,

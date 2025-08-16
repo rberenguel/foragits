@@ -148,3 +148,14 @@ canvas[style*="z-index: 2"] {
 #mobile-controls button:active {
   background-color: #555;
 }
+
+#info-box {
+  background-color: #222;
+  padding: 5px 10px;
+  border-radius: 3px;
+  margin-top: 5px;
+  width: 1260px;
+  box-sizing: border-box;
+  min-height: 1.5em;
+  color: #ccc;
+}
