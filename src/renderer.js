@@ -76,6 +76,35 @@ export class Renderer {
       return info?.isTransparent ?? false;
     };
     this.fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
+
+    rotCanvas.addEventListener("click", (e) => {
+      const player = this.game.player;
+      if (player.combatStance !== "aiming" && player.combatStance !== "challenging") {
+        return;
+      }
+
+      const rect = rotCanvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const playerScreenX = Math.floor(DISPLAY_WIDTH / 2);
+      const playerScreenY = Math.floor(DISPLAY_HEIGHT / 2);
+
+      const playerPixelX = playerScreenX * this.cellWidth + this.cellWidth / 2;
+      const playerPixelY = playerScreenY * this.cellHeight + this.cellHeight / 2;
+
+      const deltaX = clickX - playerPixelX;
+      const deltaY = clickY - playerPixelY;
+
+      let angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+      
+      // Snap to nearest 5 degrees
+      angle = Math.round(angle / 5) * 5;
+
+      player.aimAngle = (angle + 360) % 360;
+
+      this.drawAll();
+    });
   }
   _drawShopScreen() {
     // Placeholder for shop UI
