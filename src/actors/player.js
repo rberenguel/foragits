@@ -85,6 +85,25 @@ export class Player {
       if (key === "Escape") this.game.stopShopping();
       return;
     }
+    if (this.game.gameState === "info") {
+      if (key === "x" || key === "Escape") {
+        this.game.toggleInfoMode();
+        return;
+      }
+      const keyMap = {
+        ArrowUp: { x: 0, y: -1 },
+        ArrowDown: { x: 0, y: 1 },
+        ArrowLeft: { x: -1, y: 0 },
+        ArrowRight: { x: 1, y: 0 },
+      };
+      if (key in keyMap) {
+        const { x: dx, y: dy } = keyMap[key];
+        this.game.infoCursor.x += dx;
+        this.game.infoCursor.y += dy;
+        this.game.renderer.drawAll();
+      }
+      return;
+    }
     if (key === "?") {
       this.game.toggleHelp();
       return;
@@ -136,6 +155,9 @@ export class Player {
         break;
       case "m":
         this.game.toggleMap();
+        break;
+      case "x":
+        this.game.toggleInfoMode();
         break;
     }
 

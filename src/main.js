@@ -24,6 +24,19 @@ class Game {
     this.turn = 0;
     this.activeShopkeeper = null;
     this.seenEnemies = new Set();
+    this.infoCursor = null;
+  }
+
+  toggleInfoMode() {
+    if (this.gameState === "info") {
+      this.gameState = "playing";
+      this.infoCursor = null;
+      this.renderer.displayMessage(""); // Clear message log
+    } else {
+      this.gameState = "info";
+      this.infoCursor = { x: this.player.x, y: this.player.y };
+    }
+    this.renderer.drawAll();
   }
 
   async init() {

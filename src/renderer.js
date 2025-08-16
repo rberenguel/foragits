@@ -83,6 +83,19 @@ export class Renderer {
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
 
+      if (this.game.gameState === "info") {
+        const tileX = Math.floor(clickX / this.cellWidth);
+        const tileY = Math.floor(clickY / this.cellHeight);
+        
+        const topLeftX = player.x - Math.floor(DISPLAY_WIDTH / 2);
+        const topLeftY = player.y - Math.floor(DISPLAY_HEIGHT / 2);
+
+        this.game.infoCursor.x = topLeftX + tileX;
+        this.game.infoCursor.y = topLeftY + tileY;
+        
+        return;
+      }
+
       if (player.combatStance === "aiming" || player.combatStance === "challenging") {
         // --- AIMING LOGIC ---
         const playerScreenX = Math.floor(DISPLAY_WIDTH / 2);
@@ -374,10 +387,70 @@ export class Renderer {
         this.particleCanvas.height,
       );
       this._drawAimLines();
+      if (this.game.gameState === "info") {
+        this._drawInfoCursor();
+      }
       this._animateParticles();
       requestAnimationFrame(loop);
     };
     loop();
+  }
+
+  _drawInfoCursor() {
+    const { infoCursor } = this.game;
+    if (!infoCursor) return;
+
+    const player = this.game.player;
+    const topLeftX = player.x - Math.floor(DISPLAY_WIDTH / 2);
+    const topLeftY = player.y - Math.floor(DISPLAY_HEIGHT / 2);
+
+    const screenPos = this._worldToScreen(infoCursor.x, infoCursor.y, topLeftX, topLeftY);
+
+    if (screenPos) {
+        const x = screenPos.x * this.cellWidth;
+        const y = screenPos.y * this.cellHeight;
+        this.particleCtx.strokeStyle = '#FFFF00';
+        this.particleCtx.lineWidth = 2;
+        this.particleCtx.strokeRect(x, y, this.cellWidth, this.cellHeight);
+
+        const infoText = this._getInfoForTile(infoCursor.x, infoCursor.y);
+        this.displayMessage(infoText);
+    } else {
+        this.displayMessage("Cursor is outside the visible area.");
+    }
+  }
+
+  _getInfoForTile(x, y) {
+    const key = `${x},${y}`;
+    if (!this.visibleTiles.has(key) && !this.exploredTiles.has(key)) {
+      return "You don't know what is there.";
+    }
+
+    // Check for actors
+    const actors = [this.game.player, ...this.game.enemies, ...this.game.npcs];
+    const actor = actors.find(a => a.x === x && a.y === y && !a.isCorpse());
+    if (actor) {
+      return `You see ${actor.name}.`;
+    }
+    const corpse = actors.find(a => a.x === x && a.y === y && a.isCorpse());
+    if (corpse) {
+        return `The corpse of ${corpse.name}.`;
+    }
+
+    // Check for items
+    const items = this.game.world.itemsOnGround.get(key);
+    if (items && items.length > 0) {
+      return `You see ${items.map(i => i.name).join(", ")}.`;
+    }
+
+    // Check for terrain
+    const tile = this.game.world.getTileAt(x, y);
+    const info = terrainInfo[tile];
+    if (info) {
+      return `You see ${info.name}.`;
+    }
+
+    return "You see nothing special.";
   }
 
   _drawAimLines() {
