@@ -18,7 +18,7 @@ function getDirectionName(dx, dy) {
 }
 
 export class Player {
-  constructor(game, x, y) {
+  constructor(game, x, y, onStateChange = () => {}) {
     this.name = "You";
     this.game = game;
     this.x = x;
@@ -28,9 +28,19 @@ export class Player {
     this.color = "#773300";
     this.aimAngle = 0; // Still needed for direction
     this.money = 2;
+    this.onStateChange = onStateChange;
 
     // --- NEW STATE MACHINE ---
-    this.combatStance = "standing"; // 'standing', 'ducking', 'challenging'
+    this._combatStance = "standing"; // 'standing', 'ducking', 'challenging'
+    Object.defineProperty(this, "combatStance", {
+      get: () => this._combatStance,
+      set: (value) => {
+        if (this._combatStance !== value) {
+          this._combatStance = value;
+          this.onStateChange();
+        }
+      },
+    });
 
     this.inventory = [
       createItem("revolver_rusty", { equipped: true }),
@@ -102,7 +112,6 @@ export class Player {
         break;
       case "f":
         if (isAimingStance) {
-          console.log("WTF", this.game)
           tookTurn = this.game.playerFire(this);
         }
         break;

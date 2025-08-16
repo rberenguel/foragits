@@ -8,12 +8,14 @@ import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from "./constants.js";
 import { terrainInfo } from "./terrain.js";
 import { rollDice } from "./utils.js";
 import { TILE_TYPE } from "./terrain.js";
+import { setupMobileControls } from "./mobile_controls.js";
+
 
 class Game {
   constructor() {
     this.world = new World(this);
     this.renderer = new Renderer(this);
-    this.player = new Player(this, 0, 0);
+    this.player = new Player(this, 0, 0, () => setupMobileControls(this));
     this.enemies = [];
     this.npcs = [];
     this.scheduler = new ROT.Scheduler.Simple();
@@ -29,6 +31,7 @@ class Game {
     document
       .getElementById("help-button")
       .addEventListener("click", () => this.toggleHelp());
+    setupMobileControls(this);
 
     const turnManager = {
       act: () => {
