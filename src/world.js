@@ -218,25 +218,31 @@ export class World {
             continue;
           }
 
-          if (
-            Math.hypot(worldX - settlement.x, worldY - settlement.y) <
-            SETTLEMENT_RADIUS
-          ) {
+          const distance =
+            Math.abs(worldX - settlement.x) + Math.abs(worldY - settlement.y);
+          if (distance <= SETTLEMENT_RADIUS) {
             let tileType = TILE_TYPE.FLOOR;
             for (const b of settlement.buildings) {
               if (worldX === b.door.x && worldY === b.door.y) {
                 tileType = TILE_TYPE.DOOR;
                 break;
               }
-              const isTopOrBottom =
-                (worldY === b.y || worldY === b.y + b.height - 1) &&
+              // This logic correctly draws a full, closed rectangle without gaps.
+              const isInsideOuterRect =
                 worldX >= b.x &&
-                worldX < b.x + b.width;
-              const isLeftOrRight =
-                (worldX === b.x || worldX === b.x + b.width - 1) &&
+                worldX < b.x + b.width &&
                 worldY >= b.y &&
                 worldY < b.y + b.height;
-              if (isTopOrBottom || isLeftOrRight) {
+
+              // This defines the "hollow" area inside the walls
+              const isInsideInnerRect =
+                worldX > b.x &&
+                worldX < b.x + b.width - 1 &&
+                worldY > b.y &&
+                worldY < b.y + b.height - 1;
+
+              // A tile is a wall if it's in the outer box but not the inner box.
+              if (isInsideOuterRect && !isInsideInnerRect) {
                 tileType = TILE_TYPE.SETTLEMENT_WALL;
                 break;
               }

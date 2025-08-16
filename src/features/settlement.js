@@ -157,17 +157,43 @@ export class Settlement {
     const numBuildings = ROT.RNG.getUniformInt(2, 3);
     const shopIndex = ROT.RNG.getUniformInt(0, numBuildings - 1);
 
+    const doesOverlap = (b1, b2) => {
+      const buffer = 2; // Minimum space between buildings
+      return (
+        b1.x < b2.x + b2.width + buffer &&
+        b1.x + b1.width + buffer > b2.x &&
+        b1.y < b2.y + b2.height + buffer &&
+        b1.y + b1.height + buffer > b2.y
+      );
+    };
+
     for (let i = 0; i < numBuildings; i++) {
-      const building = {
-        x: this.x + ROT.RNG.getUniformInt(-15, 15),
-        y: this.y + ROT.RNG.getUniformInt(-15, 15),
-        width: ROT.RNG.getUniformInt(5, 9),
-        height: ROT.RNG.getUniformInt(5, 9),
-        isShop: i === shopIndex, // Designate one building as the shop
-        settlementName: this.name,
-      };
-      building.door = this._createDoorForBuilding(building);
-      buildings.push(building);
+      let building;
+      let overlaps;
+      let attempts = 0;
+      do {
+        overlaps = false;
+        building = {
+          x: this.x + ROT.RNG.getUniformInt(-15, 15),
+          y: this.y + ROT.RNG.getUniformInt(-15, 15),
+          width: ROT.RNG.getUniformInt(5, 9),
+          height: ROT.RNG.getUniformInt(5, 9),
+          isShop: i === shopIndex,
+          settlementName: this.name,
+        };
+        for (const existing of buildings) {
+          if (doesOverlap(building, existing)) {
+            overlaps = true;
+            break;
+          }
+        }
+        attempts++;
+      } while (overlaps && attempts < 100);
+
+      if (!overlaps) {
+        building.door = this._createDoorForBuilding(building);
+        buildings.push(building);
+      }
     }
     return buildings;
   }

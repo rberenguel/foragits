@@ -127,10 +127,10 @@ canvas[style*="z-index: 2"] {
 }
 
 .control-group {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    margin: 0 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin: 0 10px;
 }
 
 #mobile-controls button {
@@ -151,7 +151,7 @@ canvas[style*="z-index: 2"] {
 
 #info-box {
   position: absolute;
-  bottom: 0;
+  bottom: 20%;
   left: 50%;
   transform: translateX(-50%);
   width: 80%;

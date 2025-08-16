@@ -86,22 +86,27 @@ export class Renderer {
       if (this.game.gameState === "info") {
         const tileX = Math.floor(clickX / this.cellWidth);
         const tileY = Math.floor(clickY / this.cellHeight);
-        
+
         const topLeftX = player.x - Math.floor(DISPLAY_WIDTH / 2);
         const topLeftY = player.y - Math.floor(DISPLAY_HEIGHT / 2);
 
         this.game.infoCursor.x = topLeftX + tileX;
         this.game.infoCursor.y = topLeftY + tileY;
-        
+
         return;
       }
 
-      if (player.combatStance === "aiming" || player.combatStance === "challenging") {
+      if (
+        player.combatStance === "aiming" ||
+        player.combatStance === "challenging"
+      ) {
         // --- AIMING LOGIC ---
         const playerScreenX = Math.floor(DISPLAY_WIDTH / 2);
         const playerScreenY = Math.floor(DISPLAY_HEIGHT / 2);
-        const playerPixelX = playerScreenX * this.cellWidth + this.cellWidth / 2;
-        const playerPixelY = playerScreenY * this.cellHeight + this.cellHeight / 2;
+        const playerPixelX =
+          playerScreenX * this.cellWidth + this.cellWidth / 2;
+        const playerPixelY =
+          playerScreenY * this.cellHeight + this.cellHeight / 2;
         const deltaX = clickX - playerPixelX;
         const deltaY = clickY - playerPixelY;
         let angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
@@ -121,10 +126,12 @@ export class Renderer {
         }
 
         let key;
-        if (distX > distY) { // Prioritize horizontal movement
+        if (distX > distY) {
+          // Prioritize horizontal movement
           if (normalizedX < 0.3) key = "ArrowLeft";
           else if (normalizedX > 0.7) key = "ArrowRight";
-        } else { // Prioritize vertical movement
+        } else {
+          // Prioritize vertical movement
           if (normalizedY < 0.3) key = "ArrowUp";
           else if (normalizedY > 0.7) key = "ArrowDown";
         }
@@ -407,29 +414,33 @@ export class Renderer {
     const topLeftX = player.x - Math.floor(DISPLAY_WIDTH / 2);
     const topLeftY = player.y - Math.floor(DISPLAY_HEIGHT / 2);
 
-    const screenPos = this._worldToScreen(infoCursor.x, infoCursor.y, topLeftX, topLeftY);
+    const screenPos = this._worldToScreen(
+      infoCursor.x,
+      infoCursor.y,
+      topLeftX,
+      topLeftY,
+    );
 
     if (screenPos) {
-        const x = screenPos.x * this.cellWidth;
-        const y = screenPos.y * this.cellHeight;
-        this.particleCtx.strokeStyle = '#FFFF00';
-        this.particleCtx.lineWidth = 2;
-        this.particleCtx.strokeRect(x, y, this.cellWidth, this.cellHeight);
+      const x = screenPos.x * this.cellWidth;
+      const y = screenPos.y * this.cellHeight;
+      this.particleCtx.strokeStyle = "#FFFF00";
+      this.particleCtx.lineWidth = 2;
+      this.particleCtx.strokeRect(x, y, this.cellWidth, this.cellHeight);
 
-        const info = this._getInfoForTile(infoCursor.x, infoCursor.y);
-        this.displayMessage(info.name);
+      const info = this._getInfoForTile(infoCursor.x, infoCursor.y);
+      this.displayMessage(info.name);
 
-        const infoBox = document.getElementById("info-box");
-        if (info.description) {
-            infoBox.textContent = info.description;
-            infoBox.classList.remove("hidden");
-        } else {
-            infoBox.textContent = "";
-            infoBox.classList.add("hidden");
-        }
-
+      const infoBox = document.getElementById("info-box");
+      if (info.description) {
+        infoBox.textContent = info.description;
+        infoBox.classList.remove("hidden");
+      } else {
+        infoBox.textContent = "";
+        infoBox.classList.add("hidden");
+      }
     } else {
-        this.displayMessage("Cursor is outside the visible area.");
+      this.displayMessage("Cursor is outside the visible area.");
     }
   }
 
@@ -441,19 +452,19 @@ export class Renderer {
 
     // Check for actors
     const actors = [this.game.player, ...this.game.enemies, ...this.game.npcs];
-    const actor = actors.find(a => a.x === x && a.y === y && !a.isCorpse());
+    const actor = actors.find((a) => a.x === x && a.y === y && !a.isCorpse());
     if (actor) {
       return { name: `You see ${actor.name}.` };
     }
-    const corpse = actors.find(a => a.x === x && a.y === y && a.isCorpse());
+    const corpse = actors.find((a) => a.x === x && a.y === y && a.isCorpse());
     if (corpse) {
-        return { name: `The corpse of ${corpse.name}.` };
+      return { name: `The corpse of ${corpse.name}.` };
     }
 
     // Check for items
     const items = this.game.world.itemsOnGround.get(key);
     if (items && items.length > 0) {
-      return { name: `You see ${items.map(i => i.name).join(", ")}.` };
+      return { name: `You see ${items.map((i) => i.name).join(", ")}.` };
     }
 
     // Check for terrain

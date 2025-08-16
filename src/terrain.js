@@ -22,6 +22,9 @@ export const TILE_TYPE = {
   FENCE_POST: "┼",
 };
 
+const duckableDescription =
+  "You can duck behind it for cover. You can aim and shot from behind cover.";
+
 export const terrainInfo = {
   [TILE_TYPE.FLOOR]: {
     name: "sand",
@@ -40,7 +43,7 @@ export const terrainInfo = {
   },
   [TILE_TYPE.CACTUS]: {
     name: "a saguaro cactus",
-    description: "A tall cactus. You can duck behind it for cover. Aiming from cover might give you an edge.",
+    description: `A tall cactus. ${duckableDescription}`,
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
@@ -49,7 +52,7 @@ export const terrainInfo = {
   },
   [TILE_TYPE.CACTUS_2]: {
     name: "a prickly pear cactus",
-    description: "Provides good cover from gunfire.",
+    description: duckableDescription,
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
@@ -58,6 +61,7 @@ export const terrainInfo = {
   },
   [TILE_TYPE.CACTUS_3]: {
     name: "a barrel cactus",
+    description: duckableDescription,
     isPassable: false,
     isTransparent: true,
     isBulletPassable: false,
@@ -108,6 +112,7 @@ export const terrainInfo = {
   },
   [TILE_TYPE.FIRE_PIT_INACTIVE]: {
     name: "an inactive fire pit",
+    description: "You can cook beans on it",
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
@@ -115,6 +120,7 @@ export const terrainInfo = {
   },
   [TILE_TYPE.ROCK]: {
     name: "a rock",
+    description: duckableDescription,
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
@@ -122,6 +128,7 @@ export const terrainInfo = {
   },
   [TILE_TYPE.WATER_TROUGH]: {
     name: "a water trough",
+    description: duckableDescription,
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
@@ -130,6 +137,7 @@ export const terrainInfo = {
   },
   [TILE_TYPE.CRATE]: {
     name: "a wooden crate",
+    description: duckableDescription,
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
@@ -138,6 +146,7 @@ export const terrainInfo = {
   },
   [TILE_TYPE.BARREL]: {
     name: "a barrel",
+    description: duckableDescription,
     isPassable: true,
     isTransparent: true,
     isBulletPassable: true,
