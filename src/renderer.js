@@ -79,31 +79,48 @@ export class Renderer {
 
     rotCanvas.addEventListener("click", (e) => {
       const player = this.game.player;
-      if (player.combatStance !== "aiming" && player.combatStance !== "challenging") {
-        return;
-      }
-
       const rect = rotCanvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
 
-      const playerScreenX = Math.floor(DISPLAY_WIDTH / 2);
-      const playerScreenY = Math.floor(DISPLAY_HEIGHT / 2);
+      if (player.combatStance === "aiming" || player.combatStance === "challenging") {
+        // --- AIMING LOGIC ---
+        const playerScreenX = Math.floor(DISPLAY_WIDTH / 2);
+        const playerScreenY = Math.floor(DISPLAY_HEIGHT / 2);
+        const playerPixelX = playerScreenX * this.cellWidth + this.cellWidth / 2;
+        const playerPixelY = playerScreenY * this.cellHeight + this.cellHeight / 2;
+        const deltaX = clickX - playerPixelX;
+        const deltaY = clickY - playerPixelY;
+        let angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+        angle = Math.round(angle / 5) * 5; // Snap to nearest 5 degrees
+        player.aimAngle = (angle + 360) % 360;
+        this.drawAll(); // Redraw to show new aim line immediately
+      } else {
+        // --- MOVEMENT LOGIC ---
+        const normalizedX = clickX / rect.width;
+        const normalizedY = clickY / rect.height;
+        const distX = Math.abs(normalizedX - 0.5);
+        const distY = Math.abs(normalizedY - 0.5);
 
-      const playerPixelX = playerScreenX * this.cellWidth + this.cellWidth / 2;
-      const playerPixelY = playerScreenY * this.cellHeight + this.cellHeight / 2;
+        // Dead zone in the center (40% of the screen)
+        if (distX < 0.2 && distY < 0.2) {
+          return;
+        }
 
-      const deltaX = clickX - playerPixelX;
-      const deltaY = clickY - playerPixelY;
+        let key;
+        if (distX > distY) { // Prioritize horizontal movement
+          if (normalizedX < 0.3) key = "ArrowLeft";
+          else if (normalizedX > 0.7) key = "ArrowRight";
+        } else { // Prioritize vertical movement
+          if (normalizedY < 0.3) key = "ArrowUp";
+          else if (normalizedY > 0.7) key = "ArrowDown";
+        }
 
-      let angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-      
-      // Snap to nearest 5 degrees
-      angle = Math.round(angle / 5) * 5;
-
-      player.aimAngle = (angle + 360) % 360;
-
-      this.drawAll();
+        if (key) {
+          const event = new KeyboardEvent("keydown", { key: key });
+          player.handleEvent(event);
+        }
+      }
     });
   }
   _drawShopScreen() {
