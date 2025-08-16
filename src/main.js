@@ -106,6 +106,7 @@ class Game {
       this.renderer.displayMessage("Click.");
       return false; // Does not take a turn
     }
+    window.sampler("revolver-shot-1", 0.5)
 
     weapon.loaded--; // Consume ammo
 
@@ -169,6 +170,11 @@ class Game {
     loser.combatStance = "ducking";
   }
   toggleInventory() {
+    window.sampler(
+      this.gameState === "inventory" ? "ui-close" : "ui-open",
+      0.2,
+      { pan: 0 },
+    );
     this.gameState = this.gameState === "inventory" ? "playing" : "inventory";
     this.renderer.drawAll();
   }

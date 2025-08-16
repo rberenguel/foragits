@@ -102,6 +102,7 @@ export class Player {
         break;
       case "f":
         if (isAimingStance) {
+          console.log("WTF", this.game)
           tookTurn = this.game.playerFire(this);
         }
         break;
@@ -463,6 +464,7 @@ export class Player {
     } else {
       this.inventory.splice(beanIndex, 1);
     }
+    //window.sampler("eat", 0.5, { pan: 0 });
     this.game.renderer.displayMessage(
       "You warm a can of beans by the fire. You feel better.",
     );

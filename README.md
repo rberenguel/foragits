@@ -48,3 +48,8 @@ You can press `d` to duck behind an adjacent rock for cover. This takes a turn. 
 #### Survival
 
 The desert is harsh. Look for inactive fire pits (`~`). If you are standing next to one and have a `Can of Beans` in your inventory, press `u` to cook it and restore some health.
+
+
+## Audio credits
+
+- [Multiple gun shot](https://pixabay.com/sound-effects/sound-effects-multiple-gun-shot-247125/) by ScottishPerson
