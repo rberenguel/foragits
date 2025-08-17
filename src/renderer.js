@@ -461,6 +461,11 @@ export class Renderer {
       return { name: `The corpse of ${corpse.name}.` };
     }
 
+    // Check for placards before items
+    const placardText = this.game.world.placardMap.get(key)?.name;
+    if (placardText) {
+      return { name: `You see a wooden sign: ${placardText}` };
+    }
     // Check for items
     const items = this.game.world.itemsOnGround.get(key);
     if (items && items.length > 0) {

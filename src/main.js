@@ -174,8 +174,11 @@ class Game {
     const playerWins = Math.random() >= 0.5;
     const winner = playerWins ? player : bandit;
     const loser = playerWins ? bandit : player;
-
-    this.renderer.displayMessage(`${winner.name} is faster!`);
+    let msg = `${winner.name} is faster!`
+    if(playerWins){
+      msg = "You are faster!"
+    }
+    this.renderer.displayMessage();
 
     // Winner gets an accuracy bonus (negative error)
     // Loser gets a panic shot (large accuracy penalty)
