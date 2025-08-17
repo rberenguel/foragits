@@ -630,31 +630,52 @@ export class Renderer {
     return { x: screenX, y: screenY };
   }
 
-  createRicochetEffect(worldX, worldY, shotVector) {
-    const screenPos = this._worldToScreen(
-      worldX,
-      worldY,
-      this.game.player.x - Math.floor(DISPLAY_WIDTH / 2),
-      this.game.player.y - Math.floor(DISPLAY_HEIGHT / 2),
-    );
-    if (!screenPos) return;
+  // renderer.js
 
-    const originX = screenPos.x * this.cellWidth + this.cellWidth / 2;
-    const originY = screenPos.y * this.cellHeight + this.cellHeight / 2;
-    const baseAngle = Math.atan2(-shotVector.y, -shotVector.x);
+  // renderer.js
 
-    for (let i = 0; i < 15; i++) {
-      const angle = baseAngle + (Math.random() - 0.5) * (Math.PI / 2);
-      const speed = Math.random() * 2 + 0.5;
-      this.particles.push({
-        x: originX,
-        y: originY,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        lifespan: Math.random() * 20 + 15,
-        color: ["#8B4513", "#A0522D", "#696969"][Math.floor(Math.random() * 3)],
-        size: Math.random() * 2 + 1,
-      });
+  // renderer.js
+
+  createRicochetEffect(worldX, worldY, shotVector, delay = 0) {
+    // This function contains all the logic to create the particles.
+    const createParticles = () => {
+      const screenPos = this._worldToScreen(
+        worldX,
+        worldY,
+        this.game.player.x - Math.floor(DISPLAY_WIDTH / 2),
+        this.game.player.y - Math.floor(DISPLAY_HEIGHT / 2),
+      );
+      if (!screenPos) return;
+
+      const originX = screenPos.x * this.cellWidth + this.cellWidth / 2;
+      const originY = screenPos.y * this.cellHeight + this.cellHeight / 2;
+      const baseAngle = Math.atan2(-shotVector.y, -shotVector.x);
+
+      for (let i = 0; i < 15; i++) {
+        const angle = baseAngle + (Math.random() - 0.5) * (Math.PI / 2);
+        const speed = Math.random() * 2 + 0.5;
+        this.particles.push({
+          x: originX,
+          y: originY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          lifespan: Math.random() * 20 + 15,
+          color: ["#8B4513", "#A0522D", "#696969"][
+            Math.floor(Math.random() * 3)
+          ],
+          size: Math.random() * 2 + 1,
+        });
+      }
+    };
+
+    // This logic is crucial:
+    // IF there's a delay, schedule it for later.
+    if (delay > 0) {
+      setTimeout(createParticles, delay);
+    }
+    // OTHERWISE (and only otherwise), create them now.
+    else {
+      createParticles();
     }
   }
 

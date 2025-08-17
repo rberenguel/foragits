@@ -438,7 +438,16 @@ class Game {
             10,
           );
         } else {
-          this.renderer.createRicochetEffect(point.x, point.y, aimVector);
+          const distance = Math.hypot(point.x - attacker.x, point.y - attacker.y);
+          const soundDelaySecs = distance * 0.04; // Adjust multiplier for desired speed
+          const visualDelayMs = soundDelaySecs * 1000;
+          window.sampler("hit-rock", 1.8, {
+              delay: soundDelaySecs,
+              pan: window.calculatePanFromPosition(point, this.player, DISPLAY_WIDTH),
+              velocity: 9.0,
+
+          });
+          this.renderer.createRicochetEffect(point.x, point.y, aimVector, visualDelayMs);
         }
         return;
       }

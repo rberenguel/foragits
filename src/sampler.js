@@ -31,9 +31,10 @@ const soundMap = {
   "revolver-shot-1": "C1",
   "revolver-shot-2": "C2",
   "revolver-shot-3": "C3",
+  "hit-rock": "E1",
   /*"shotgun": "C",
   "hit-flesh": "D#1",
-  "hit-rock": "E1",
+  
   ricochet: "F1",
   reload: "F#1",
   duck: "G1",
@@ -72,16 +73,19 @@ const sampler = new Tone.Sampler({
 window.sampler = (soundName, duration, settings = {}) => {
   const note = soundMap[soundName];
   if (!note) {
-    // console.error(`Sound "${soundName}" not found in soundMap.`);
+    console.info(`Could not find ${soundName}`);
     return;
   }
 
   try {
+    console.info(`Playing ${soundName}`);
     const velocity = settings.velocity ?? 1;
     const pan = settings.pan ?? 0;
+    const delay = settings.delay ?? 0;
     const now = Tone.now();
-    panner.pan.setValueAtTime(pan, now);
-    sampler.triggerAttackRelease(note, duration, now, velocity);
+    const startTime = now + delay;
+    panner.pan.setValueAtTime(pan, startTime);
+    sampler.triggerAttackRelease(note, duration, startTime, velocity);
   } catch (err) {
     // This can be noisy if tone.js is not present.
   }
