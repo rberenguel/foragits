@@ -212,8 +212,13 @@ export class Player {
       this.game.renderer.drawAll(); // Draw at the end of a successful turn
       window.removeEventListener("keydown", this);
       this.game.engine.unlock();
-    } else if (isAimingStance) {
-      this.game.renderer.drawAll(); // Redraw for non-turn actions like aiming
+    } else if (
+      !tookTurn &&
+      (this.combatStance === "aiming" || this.combatStance === "challenging")
+    ) {
+      // If no turn was taken, but we are in an aiming stance (e.g., adjusting aim),
+      // we should still redraw to give the player immediate feedback.
+      this.game.renderer.drawAll();
     }
   }
   _updateAimAngle(key) {
