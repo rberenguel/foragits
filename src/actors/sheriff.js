@@ -1,6 +1,6 @@
 import { NPC } from "./npc.js";
 import { createItem } from "../items.js";
-import { terrainInfo } from "../terrain.js";
+import { terrainInfo, TILE_TYPE } from "../terrain.js";
 import { DISPLAY_WIDTH } from "../constants.js";
 
 export class Sheriff extends NPC {
