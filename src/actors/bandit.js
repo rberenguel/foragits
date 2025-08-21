@@ -115,6 +115,8 @@ export class Bandit {
     this.color = "#654321";
     this.lastKnownPlayerPosition = null;
     this.baseSettlement = baseSettlement;
+    this.isRoamer = ROT.RNG.getUniform() < 0.3; // 30% chance to be a roamer
+    if (this.isRoamer) this.baseSettlement = null; // Roamers don't have a home settlement
     this.name = generateBanditName();
     this.aimError = 8;
 
@@ -315,6 +317,10 @@ export class Bandit {
     }
   }
   _pathfindToGoal() {
+    if (this.isRoamer) {
+      this._wanderRandomly();
+      return;
+    }
     // This logic for non-combat movement remains the same
     const target = this.baseSettlement;
     if (target && Math.hypot(this.x - target.x, this.y - target.y) < 200) {

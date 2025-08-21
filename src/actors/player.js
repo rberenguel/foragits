@@ -2,6 +2,7 @@
 import { terrainInfo, TILE_TYPE } from "../terrain.js";
 import { createItem } from "../items.js";
 import { Shopkeeper } from "./shopkeeper.js";
+import { Sheriff } from "./sheriff.js";
 
 function getDirectionName(dx, dy) {
   if (dx === 0 && dy === 0) return "here";
@@ -490,6 +491,24 @@ export class Player {
         if (npc) {
           if (npc instanceof Shopkeeper) {
             this.game.startShopping(npc);
+          } else if (npc instanceof Sheriff) {
+            const rustyRevolverIndex = this.inventory.findIndex(i => i.templateId === "revolver_rusty");
+            if (rustyRevolverIndex !== -1) {
+              const allRevolvers = this.inventory.filter(i => i.type === "weapon" && (i.templateId === "revolver" || i.templateId === "revolver_rusty"));
+              if (allRevolvers.length > 1) { // Can sell if player has more than one revolver (rusty or normal)
+                const bountyValue = 5;
+                this.game.renderer.displayMessage(`"You got a rusty revolver? That's worth a bounty of ${bountyValue}." -${npc.name}`);
+                this.game.player.money += bountyValue;
+                this.inventory.splice(rustyRevolverIndex, 1);
+                this.game.renderer.drawAll();
+              } else {
+                this.game.renderer.displayMessage(`"You should hold onto that, it's your only revolver." -${npc.name}`);
+              }
+            } else {
+              this.game.renderer.displayMessage(
+                `"${npc.getNextDialogue()}" -${npc.name}`,
+              );
+            }
           } else {
             this.game.renderer.displayMessage(
               `"${npc.getNextDialogue()}" -${npc.name}`,

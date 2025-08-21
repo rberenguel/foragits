@@ -604,3 +604,11 @@ class Game {
 
 const game = new Game();
 game.init();
+
+// Global function for debugging
+window.teleportPlayer = (x, y) => {
+  game.player.x = x;
+  game.player.y = y;
+  game.renderer.drawAll();
+  game.renderer.displayMessage(`Teleported to ${x},${y}`);
+};

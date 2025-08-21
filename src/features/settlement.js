@@ -154,11 +154,12 @@ export class Settlement {
 
   _generateBuildings() {
     const buildings = [];
-    const numBuildings = ROT.RNG.getUniformInt(2, 3);
+    const numBuildings = ROT.RNG.getUniformInt(4, 7); // Increased number of buildings
+    console.log(`Settlement ${this.name}: Attempting to generate ${numBuildings} buildings.`);
     const shopIndex = ROT.RNG.getUniformInt(0, numBuildings - 1);
 
     const doesOverlap = (b1, b2) => {
-      const buffer = 2; // Minimum space between buildings
+      const buffer = 1; // Reduced minimum space between buildings
       return (
         b1.x < b2.x + b2.width + buffer &&
         b1.x + b1.width + buffer > b2.x &&
@@ -174,10 +175,10 @@ export class Settlement {
       do {
         overlaps = false;
         building = {
-          x: this.x + ROT.RNG.getUniformInt(-15, 15),
-          y: this.y + ROT.RNG.getUniformInt(-15, 15),
-          width: ROT.RNG.getUniformInt(5, 9),
-          height: ROT.RNG.getUniformInt(5, 9),
+          x: this.x + ROT.RNG.getUniformInt(-25, 25), // Increased placement range
+          y: this.y + ROT.RNG.getUniformInt(-25, 25), // Increased placement range
+          width: ROT.RNG.getUniformInt(4, 7),
+          height: ROT.RNG.getUniformInt(4, 7),
           isShop: i === shopIndex,
           settlementName: this.name,
         };
@@ -188,13 +189,19 @@ export class Settlement {
           }
         }
         attempts++;
-      } while (overlaps && attempts < 100);
+        if (attempts >= 500) {
+          console.warn(`Settlement ${this.name}: Failed to place building ${i} after ${attempts} attempts due to persistent overlaps.`);
+          break; // Exit loop if too many attempts
+        }
+      } while (overlaps);
 
       if (!overlaps) {
         building.door = this._createDoorForBuilding(building);
         buildings.push(building);
+        console.log(`Settlement ${this.name}: Placed building ${i} at (${building.x},${building.y}) with size ${building.width}x${building.height}, isShop: ${building.isShop}. Total buildings: ${buildings.length}`);
       }
     }
+    console.log(`Settlement ${this.name}: Final count of generated buildings: ${buildings.length}.`);
     return buildings;
   }
 

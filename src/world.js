@@ -3,6 +3,7 @@ import { Settlement } from "./features/settlement.js";
 import { terrainInfo, TILE_TYPE } from "./terrain.js";
 import { NPC } from "./actors/npc.js";
 import { Shopkeeper } from "./actors/shopkeeper.js";
+import { Sheriff } from "./actors/sheriff.js";
 
 const META_CHUNK_SIZE = 10; // A settlement can appear in a 10x10 chunk area
 const SETTLEMENT_CHANCE = 0.4; // 40% chance of a settlement in a meta-chunk
@@ -117,6 +118,8 @@ export class World {
     const seed = chunkX * 10007 + chunkY * 30011;
     ROT.RNG.setSeed(seed);
 
+    const settlement = this._getSettlementForChunk(chunkX, chunkY); // Moved this line up
+
     const cellular = new ROT.Map.Cellular(CHUNK_WIDTH, CHUNK_HEIGHT, {
       connected: true,
     });
@@ -124,29 +127,76 @@ export class World {
     for (let i = 0; i < 4; i++) cellular.create();
 
     cellular.create((x, y, value) => {
-      const tileRoll = ROT.RNG.getUniform();
+      const worldX = chunkX * CHUNK_WIDTH + x;
+      const worldY = chunkY * CHUNK_HEIGHT + y;
+
       let tile = TILE_TYPE.FLOOR;
-      if (value) {
-        tile = TILE_TYPE.WALL;
-      } else if (tileRoll < 0.02) {
-        const cactusType = ROT.RNG.getUniformInt(1, 3);
-        if (cactusType === 1) tile = TILE_TYPE.CACTUS;
-        else if (cactusType === 2) tile = TILE_TYPE.CACTUS_2;
-        else tile = TILE_TYPE.CACTUS_3;
-      } else if (tileRoll < 0.025) {
-        tile = TILE_TYPE.ROCK;
-      } else if (tileRoll < 0.0255) {
-        tile = TILE_TYPE.FIRE_PIT_INACTIVE;
-      } else if (tileRoll < 0.04) {
-        const shrubType = ROT.RNG.getUniformInt(1, 3);
-        if (shrubType === 1) tile = TILE_TYPE.SHRUB;
-        else if (shrubType === 2) tile = TILE_TYPE.SHRUB_2;
-        else tile = TILE_TYPE.SHRUB_3;
+      let isSettlementTile = false;
+
+      // Check if this tile is part of a settlement building
+      if (settlement) {
+        for (const b of settlement.buildings) {
+          // Check if inside the building's outer rectangle
+          const isInsideOuterRect =
+            worldX >= b.x &&
+            worldX < b.x + b.width &&
+            worldY >= b.y &&
+            worldY < b.y + b.height;
+
+          // Check if it's a door
+          if (worldX === b.door.x && worldY === b.door.y) {
+            isSettlementTile = true;
+            tile = TILE_TYPE.DOOR; // Temporarily set to door, will be overwritten later
+            break;
+          }
+          // Check if it's a wall (outer rect but not inner rect)
+          const isInsideInnerRect =
+            worldX > b.x &&
+            worldX < b.x + b.width - 1 &&
+            worldY > b.y &&
+            worldY < b.y + b.height - 1;
+
+          if (isInsideOuterRect && !isInsideInnerRect) {
+            isSettlementTile = true;
+            tile = TILE_TYPE.SETTLEMENT_WALL; // Temporarily set to wall
+            break;
+          }
+          // Check if it's inside the building (floor)
+          if (isInsideOuterRect && isInsideInnerRect) {
+            isSettlementTile = true;
+            tile = TILE_TYPE.FLOOR;
+            break;
+          }
+        }
       }
-      this.chunks[key][`${x},${y}`] = tile;
+
+      if (isSettlementTile) {
+        this.chunks[key][`${x},${y}`] = tile;
+      } else {
+        // Original terrain generation logic for non-settlement areas
+        const tileRoll = ROT.RNG.getUniform();
+        if (value) {
+          tile = TILE_TYPE.WALL;
+        } else if (tileRoll < 0.02) {
+          const cactusType = ROT.RNG.getUniformInt(1, 3);
+          if (cactusType === 1) tile = TILE_TYPE.CACTUS;
+          else if (cactusType === 2) tile = TILE_TYPE.CACTUS_2;
+          else tile = TILE_TYPE.CACTUS_3;
+        } else if (tileRoll < 0.025) {
+          tile = TILE_TYPE.ROCK;
+        } else if (tileRoll < 0.0255) {
+          tile = TILE_TYPE.FIRE_PIT_INACTIVE;
+        } else if (tileRoll < 0.04) {
+          const shrubType = ROT.RNG.getUniformInt(1, 3);
+          if (shrubType === 1) tile = TILE_TYPE.SHRUB;
+          else if (shrubType === 2) tile = TILE_TYPE.SHRUB_2;
+          else tile = TILE_TYPE.SHRUB_3;
+        }
+        this.chunks[key][`${x},${y}`] = tile;
+      }
     });
 
-    const settlement = this._getSettlementForChunk(chunkX, chunkY);
+    // const settlement = this._getSettlementForChunk(chunkX, chunkY); // This line is now commented out
     if (settlement) {
       if (!settlement.isPopulated) {
         this._populateSettlement(settlement);
@@ -201,7 +251,6 @@ export class World {
       }
 
       // 2. Draw this chunk based on the complete settlement layout
-      const SETTLEMENT_RADIUS = 25;
       for (let y = 0; y < CHUNK_HEIGHT; y++) {
         for (let x = 0; x < CHUNK_WIDTH; x++) {
           const worldX = chunkX * CHUNK_WIDTH + x;
@@ -253,10 +302,12 @@ export class World {
       }
     }
   }
-  _populateSettlement(settlement) {
+    _populateSettlement(settlement) {
+    console.log(`Populating settlement: ${settlement.name} with ${settlement.buildings.length} buildings.`);
     // First, find the shop and create the shopkeeper
     const shopBuilding = settlement.buildings.find((b) => b.isShop);
     if (shopBuilding) {
+      console.log(`Shop building found for ${settlement.name}.`);
       let x,
         y,
         attempts = 0;
@@ -270,12 +321,46 @@ export class World {
           1 +
           Math.floor(Math.random() * (shopBuilding.height - 2));
         attempts++;
-      } while (this.game.isTileOccupied(x, y) && attempts < 50);
+      } while (this.game.isTileOccupied(x, y) && attempts < 200);
 
-      if (attempts < 50) {
+      if (attempts < 200) {
         const shopkeeper = new Shopkeeper(this.game, x, y, settlement);
         this.game.npcs.push(shopkeeper); // Add to npcs list for now
         this.game.scheduler.add(shopkeeper, true);
+        console.log(`Shopkeeper placed at ${x},${y} in ${settlement.name} after ${attempts} attempts.`);
+      } else {
+        console.warn(`Failed to place shopkeeper in ${settlement.name} after ${attempts} attempts. Last attempted: ${x},${y}. Tile occupied: ${this.game.isTileOccupied(x, y)}`);
+      }
+    } else {
+      console.warn(`No shop building found for settlement: ${settlement.name}.`);
+    }
+
+    // Add Sheriff if settlement has more than 3 buildings
+    if (settlement.buildings.length >= 5) {
+      let sheriffPlaced = false;
+      for (const building of settlement.buildings) {
+        if (!building.isShop) { // Try to place sheriff in a non-shop building
+          let x, y, attempts = 0;
+          do {
+            x = building.x + 1 + Math.floor(Math.random() * (building.width - 2));
+            y = building.y + 1 + Math.floor(Math.random() * (building.height - 2));
+            attempts++;
+          } while (this.game.isTileOccupied(x, y) && attempts < 200);
+
+          if (attempts < 200) {
+            const sheriff = new Sheriff(this.game, x, y, settlement);
+            this.game.npcs.push(sheriff);
+            this.game.scheduler.add(sheriff, true);
+            console.log(`Sheriff placed at ${x},${y} in ${settlement.name} after ${attempts} attempts.`);
+            sheriffPlaced = true;
+            break; // Sheriff placed, exit loop
+          } else {
+            console.warn(`Failed to place Sheriff in building at ${building.x},${building.y} after ${attempts} attempts.`);
+          }
+        }
+      }
+      if (!sheriffPlaced) {
+        console.warn(`Could not find a suitable building to place Sheriff in ${settlement.name}.`);
       }
     }
 
@@ -293,12 +378,17 @@ export class World {
         x = building.x + 1 + Math.floor(Math.random() * (building.width - 2));
         y = building.y + 1 + Math.floor(Math.random() * (building.height - 2));
         attempts++;
-      } while (this.game.isTileOccupied(x, y) && attempts < 50);
+        if (attempts >= 50) {
+          console.warn(`Failed to place NPC in ${settlement.name} after ${attempts} attempts. Last attempted: ${x},${y}. Tile occupied: ${this.game.isTileOccupied(x, y)}`);
+          break; // Exit loop if too many attempts
+        }
+      } while (this.game.isTileOccupied(x, y));
 
       if (attempts < 50) {
         const npc = new NPC(this.game, x, y, settlement);
         this.game.npcs.push(npc);
         this.game.scheduler.add(npc, true);
+        console.log(`NPC placed at ${x},${y} in ${settlement.name} after ${attempts} attempts.`);
       }
     }
     settlement.isPopulated = true;

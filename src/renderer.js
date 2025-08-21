@@ -488,6 +488,7 @@ export class Renderer {
     if (!this.visibleTiles.has(key) && !this.exploredTiles.has(key)) {
       return { name: "You don't know what is there." };
     }
+    console.log(key)
 
     // Check for actors
     const actors = [this.game.player, ...this.game.enemies, ...this.game.npcs];
