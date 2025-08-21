@@ -28,6 +28,7 @@ class Game {
     this.shopSelectionIndex = 0; // New: Index of selected item in shop inventory
     this.playerSelectionIndex = 0; // New: Index of selected item in player inventory
     this.shopActiveInventory = "shop"; // New: "shop" or "player"
+    window.game = this
   }
 
   toggleInfoMode() {
