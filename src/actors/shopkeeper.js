@@ -1,6 +1,6 @@
 // src/actors/shopkeeper.js
 import { createItem } from "../items.js";
-
+import { DISPLAY_WIDTH } from "../constants.js";
 const firstNames = [
   "Silas",
   "Bartholomew",
@@ -69,6 +69,9 @@ export class Shopkeeper {
     if (!weapon || weapon.loaded <= 0) return;
 
     // Fire at the player
+    window.sampler("shotgun-shot", 0.5, {
+              pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
+            });
     weapon.loaded--;
     const dx = player.x - this.x;
     const dy = player.y - this.y;
@@ -82,6 +85,9 @@ export class Shopkeeper {
 
   takeDamage(amount) {
     this.hp -= amount;
+        window.sampler(`shouts-${1+Math.floor(Math.random()*5)}`, 0.5, {
+              pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
+            });
     this.isHostile = true; // Fight back!
     if (this.hp <= 0) {
       this.game.killEnemy(this);

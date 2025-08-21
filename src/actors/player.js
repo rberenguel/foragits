@@ -255,6 +255,9 @@ export class Player {
     switch (this.combatStance) {
       case "standing":
         this.combatStance = "aiming";
+        if(this.getEquippedWeapon().kind === "revolver"){
+      window.sampler(`revolver-cocking`, 0.5, );
+    }
         this.game.renderer.displayMessage("You raise your weapon.");
         break;
       case "aiming":
@@ -406,6 +409,7 @@ export class Player {
   }
 
   takeDamage(amount) {
+    window.sampler(`shouts-${1+Math.floor(Math.random()*5)}`, 0.5, );
     this.hp -= amount;
     this.combatStance = "standing"; // Getting hit makes you stand up
     this.game.renderer.flashScreen();
@@ -433,6 +437,9 @@ export class Player {
     if (ammoAvailable === 0) {
       this.game.renderer.displayMessage("You have no ammunition.");
       return false;
+    }
+    if(weapon.kind === "revolver"){
+      window.sampler(`revolver-reload`, 0.5, );
     }
     const ammoToTransfer = Math.min(ammoNeeded, ammoAvailable);
     weapon.loaded += ammoToTransfer;

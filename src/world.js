@@ -12,11 +12,13 @@ export class World {
   constructor(game) {
     this.game = game;
     this.chunks = {};
+    this.chunkGenerations = {};
     this.effects = {};
     this.settlements = new Map();
     this.placardMap = new Map();
     this.itemsOnGround = new Map();
     this.terrainHealth = new Map();
+    window.world = this
   }
   isSettlementTile(x, y) {
     const metaX = Math.floor(x / (CHUNK_WIDTH * META_CHUNK_SIZE));
@@ -107,6 +109,14 @@ export class World {
     const chunkKey = `${chunkX},${chunkY}`;
 
     if (!this.chunks[chunkKey]) {
+      if(!this.chunkGenerations[chunkKey]){
+        this.chunkGenerations[chunkKey] = 0
+      } else {
+        this.chunkGenerations[chunkKey]++
+      }
+      if(this.chunkGenerations > 0){
+        alert("Too many generations for chunk")
+      }
       this._generateChunk(chunkX, chunkY);
     }
     return this.chunks[chunkKey][`${localX},${localY}`];

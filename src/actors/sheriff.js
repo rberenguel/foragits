@@ -36,6 +36,9 @@ export class Sheriff extends NPC {
 
   takeDamage(amount) {
     this.hp -= amount;
+        window.sampler(`shouts-${1+Math.floor(Math.random()*5)}`, 0.5, {
+          pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
+        });
     this.isHostile = true; // Attacking a sheriff makes them hostile
     this.combatStance = "standing"; // Getting hit forces you out of cover
     if (this.hp <= 0) {
@@ -112,7 +115,6 @@ export class Sheriff extends NPC {
   _reloadWeapon() {
     const weapon = this.getEquippedWeapon();
     if (!weapon) return false;
-
     const ammoNeeded = weapon.capacity - weapon.loaded;
     if (ammoNeeded === 0) return false;
 
@@ -120,7 +122,11 @@ export class Sheriff extends NPC {
     if (!ammoPouch || ammoPouch.quantity <= 0) {
       return false;
     }
-
+if(weapon.kind === "revolver"){
+      window.sampler(`revolver-reload`, 0.5, {
+          pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
+        });
+    }
     const ammoToTransfer = Math.min(ammoNeeded, ammoPouch.quantity);
     weapon.loaded += ammoToTransfer;
     ammoPouch.quantity -= ammoToTransfer;

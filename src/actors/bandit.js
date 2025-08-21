@@ -145,6 +145,9 @@ export class Bandit {
   }
 
   takeDamage(amount) {
+    window.sampler(`shouts-${1+Math.floor(Math.random()*5)}`, 0.5, {
+          pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
+        });
     this.hp -= amount;
     this.combatStance = "standing"; // Getting hit forces you out of cover
     if (this.hp <= 0) {
@@ -221,6 +224,13 @@ export class Bandit {
       this.combatStance = "standing";
       this._pathfindToGoal();
     }
+    if(this.combatStance === "aiming"){
+      if(weapon.kind === "revolver"){
+      window.sampler(`revolver-cocking`, 0.5, {
+          pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
+        });
+    }
+    }
   }
 
   // --- NEW METHOD ---
@@ -236,7 +246,11 @@ export class Bandit {
       // Out of ammo entirely
       return false;
     }
-
+if(weapon.kind === "revolver"){
+      window.sampler(`revolver-reload`, 0.5, {
+          pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
+        });
+    }
     const ammoToTransfer = Math.min(ammoNeeded, ammoPouch.quantity);
     weapon.loaded += ammoToTransfer;
     ammoPouch.quantity -= ammoToTransfer;

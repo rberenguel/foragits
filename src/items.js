@@ -7,6 +7,7 @@ const itemTemplates = {
     char: "r",
     color: "#c0c0c0",
     type: "weapon",
+    kind: "revolver",
     damage: "1d6",
     capacity: 6,
     loaded: 6,
@@ -18,6 +19,7 @@ const itemTemplates = {
     char: "r",
     color: "#a35229",
     type: "weapon",
+    kind: "revolver",
     damage: "1d3",
     capacity: 6,
     loaded: 6,
@@ -29,6 +31,7 @@ const itemTemplates = {
     char: "S",
     color: "#8b4513",
     type: "weapon",
+    kind: "shotgun",
     damage: "2d8", // Deals high damage at close range
     capacity: 2,
     loaded: 2,

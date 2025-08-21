@@ -126,7 +126,13 @@ class Game {
       this.renderer.displayMessage("Click.");
       return false; // Does not take a turn
     }
-    window.sampler("revolver-shot-1", 0.5)
+    if(weapon.kind === "revolver"){
+      window.sampler("revolver-shot-1", 0.5)
+    }
+    if(weapon.kind === "shotgun"){
+      window.sampler("shotgun-shot", 0.5)
+    }
+    
 
     weapon.loaded--; // Consume ammo
 
