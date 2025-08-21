@@ -82,7 +82,50 @@ export class Player {
       return;
     }
     if (this.game.gameState === "shopping") {
-      if (key === "Escape") this.game.stopShopping();
+      const shopkeeper = this.game.activeShopkeeper;
+      const shopItems = shopkeeper.inventory.filter(i => !i.equipped);
+      const playerItems = this.inventory.filter(i => !i.equipped);
+
+      switch (key) {
+        case "Escape":
+          this.game.stopShopping();
+          break;
+        case "ArrowUp":
+          if (this.game.shopActiveInventory === "shop") {
+            this.game.shopSelectionIndex = Math.max(0, this.game.shopSelectionIndex - 1);
+          } else {
+            this.game.playerSelectionIndex = Math.max(0, this.game.playerSelectionIndex - 1);
+          }
+          break;
+        case "ArrowDown":
+          if (this.game.shopActiveInventory === "shop") {
+            this.game.shopSelectionIndex = Math.min(shopItems.length - 1, this.game.shopSelectionIndex + 1);
+          } else {
+            this.game.playerSelectionIndex = Math.min(playerItems.length - 1, this.game.playerSelectionIndex + 1);
+          }
+          break;
+        case "ArrowLeft":
+        case "ArrowRight":
+          this.game.shopActiveInventory = this.game.shopActiveInventory === "shop" ? "player" : "shop";
+          // Reset selection index when switching inventories
+          if (this.game.shopActiveInventory === "shop") {
+            this.game.shopSelectionIndex = Math.min(this.game.shopSelectionIndex, shopItems.length - 1);
+          } else {
+            this.game.playerSelectionIndex = Math.min(this.game.playerSelectionIndex, playerItems.length - 1);
+          }
+          break;
+        case "b": // Buy
+          if (this.game.shopActiveInventory === "shop" && shopItems.length > 0) {
+            this.game.buyItem(shopkeeper.inventory.indexOf(shopItems[this.game.shopSelectionIndex]));
+          }
+          break;
+        case "s": // Sell
+          if (this.game.shopActiveInventory === "player" && playerItems.length > 0) {
+            this.game.sellItem(this.inventory.indexOf(playerItems[this.game.playerSelectionIndex]));
+          }
+          break;
+      }
+      this.game.renderer.drawAll();
       return;
     }
     if (this.game.gameState === "info") {

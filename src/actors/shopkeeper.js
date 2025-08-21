@@ -41,6 +41,7 @@ export class Shopkeeper {
     ];
     this.dialogueIndex = 0;
     this.isHostile = false;
+    this.money = 100; // Shopkeeper starts with 100 money
     this.inventory = [
       createItem("shotgun", { equipped: true }),
       createItem("revolver"),

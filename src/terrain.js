@@ -100,7 +100,7 @@ export const terrainInfo = {
     name: "a wooden door",
     isPassable: true,
     isTransparent: false, // Blocks line of sight
-    isBulletPassable: true, // But not bullets
+    isBulletPassable: false, // Now blocks bullets
     color: "#A0522D",
   },
   [TILE_TYPE.PLACARD]: {

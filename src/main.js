@@ -25,6 +25,9 @@ class Game {
     this.activeShopkeeper = null;
     this.seenEnemies = new Set();
     this.infoCursor = null;
+    this.shopSelectionIndex = 0; // New: Index of selected item in shop inventory
+    this.playerSelectionIndex = 0; // New: Index of selected item in player inventory
+    this.shopActiveInventory = "shop"; // New: "shop" or "player"
   }
 
   toggleInfoMode() {
@@ -200,6 +203,9 @@ class Game {
   startShopping(shopkeeper) {
     this.activeShopkeeper = shopkeeper;
     this.gameState = "shopping";
+    this.shopSelectionIndex = 0;
+    this.playerSelectionIndex = 0;
+    this.shopActiveInventory = "shop";
     this.renderer.drawAll();
   }
   stopShopping() {
@@ -254,6 +260,71 @@ class Game {
 
     this.renderer.displayMessage(`You bought a ${item.name}.`);
     this.renderer.drawAll(); // Redraw shop and UI
+  }
+
+  sellItem(itemIndex) {
+    if (this.gameState !== "shopping" || !this.activeShopkeeper) return;
+
+    const shopkeeper = this.activeShopkeeper;
+    const item = this.player.inventory[itemIndex];
+
+    if (!item || item.equipped || item.type === "money") {
+      this.renderer.displayMessage("You can't sell that.");
+      return;
+    }
+
+    const price = this.getSellPrice(item);
+
+    if (shopkeeper.money < price) {
+      this.renderer.displayMessage("The shopkeeper doesn't have enough money.");
+      return;
+    }
+
+    this.player.money += price;
+    shopkeeper.money -= price;
+
+    // Transfer item
+    if (item.isStackable) {
+      const existingStack = shopkeeper.inventory.find(
+        (i) => i.templateId === item.templateId,
+      );
+      if (existingStack) {
+        existingStack.quantity++;
+      } else {
+        shopkeeper.inventory.push({ ...item, quantity: 1 });
+      }
+      item.quantity--;
+      if (item.quantity <= 0) {
+        this.player.inventory.splice(itemIndex, 1);
+      }
+    } else {
+      shopkeeper.inventory.push(item);
+      this.player.inventory.splice(itemIndex, 1);
+    }
+
+    this.renderer.displayMessage(`You sold a ${item.name}.`);
+    this.renderer.drawAll(); // Redraw shop and UI
+  }
+
+  getBuyPrice(item) {
+    const prices = {
+      revolver: 50,
+      ammo_bullet: 1,
+      can_of_beans: 2,
+      shotgun: 100,
+    };
+    return prices[item.templateId] || 999;
+  }
+
+  getSellPrice(item) {
+    const prices = {
+      revolver: 25,
+      ammo_bullet: 0.5,
+      can_of_beans: 1,
+      shotgun: 50,
+      revolver_rusty: 2,
+    };
+    return prices[item.templateId] || 0;
   }
 
   isTileOccupied(x, y, actorToIgnore = null) {

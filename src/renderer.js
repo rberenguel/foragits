@@ -144,9 +144,26 @@ export class Renderer {
     });
   }
   _drawShopScreen() {
-    // Placeholder for shop UI
     this.display.clear();
-    this.display.drawText(2, 1, "SHOP IS OPEN - WIP");
+    const shopkeeper = this.game.activeShopkeeper;
+    if (!shopkeeper) return;
+
+    const shopItems = shopkeeper.inventory.filter(i => !i.equipped);
+    const playerItems = this.game.player.inventory.filter(i => !i.equipped);
+
+    // Draw Shopkeeper's Inventory
+    this._drawItemList(2, 1, "SHOP INVENTORY", shopItems, this.game.shopSelectionIndex, true, false);
+
+    // Draw Player's Inventory
+    this._drawItemList(DISPLAY_WIDTH / 2 + 2, 1, "YOUR INVENTORY", playerItems, this.game.playerSelectionIndex, true, true);
+
+    // Display money
+    this.display.drawText(2, DISPLAY_HEIGHT - 5, `Your Money: ${this.game.player.money}`);
+    this.display.drawText(DISPLAY_WIDTH / 2 + 2, DISPLAY_HEIGHT - 5, `Shopkeeper's Money: ${shopkeeper.money}`);
+
+    // Instructions
+    const instructions = "[↑↓] Select | [←→] Switch Inventory | [b] Buy | [s] Sell | [esc] Exit";
+    this.display.drawText(2, DISPLAY_HEIGHT - 2, instructions);
   }
   drawAll() {
     const infoBox = document.getElementById("info-box");
@@ -207,6 +224,28 @@ export class Renderer {
       DISPLAY_HEIGHT - 2,
       closeText,
     );
+  }
+
+  _drawItemList(x, y, title, items, selectedIndex, showPrice = false, isSelling = false) {
+    this.display.drawText(x, y, `%c{#fff}%b{#333}--- ${title} ---`);
+    let currentY = y + 2;
+    items.forEach((item, index) => {
+      const letter = String.fromCharCode("a".charCodeAt(0) + index);
+      let itemText = `${letter}) ${item.name}`;
+      if (item.quantity) itemText += ` (x${item.quantity})`;
+      if (item.equipped) itemText += " (equipped)";
+
+      if (showPrice) {
+        const price = isSelling ? this.game.getSellPrice(item) : this.game.getBuyPrice(item);
+        itemText += ` (${price})`;
+      }
+
+      if (index === selectedIndex) {
+        itemText = `%c{#FF0}%b{#555}${itemText}%c{}`; // Highlight selected item
+      }
+      this.display.drawText(x, currentY, itemText);
+      currentY++;
+    });
   }
 
   _drawMap() {
