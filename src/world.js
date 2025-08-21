@@ -118,7 +118,33 @@ export class World {
     const seed = chunkX * 10007 + chunkY * 30011;
     ROT.RNG.setSeed(seed);
 
-    const settlement = this._getSettlementForChunk(chunkX, chunkY); // Moved this line up
+    const settlement = this._getSettlementForChunk(chunkX, chunkY);
+
+    // Ensure settlement details are generated before cellular automata runs
+    if (settlement && !settlement.areDetailsGenerated) {
+      settlement.generateDetails(this);
+      settlement.areDetailsGenerated = true;
+    }
+
+    // Pre-calculate all tiles occupied by settlement buildings in this chunk
+    const settlementTiles = new Set();
+    if (settlement) {
+      for (const b of settlement.buildings) {
+        for (let y = b.y; y < b.y + b.height; y++) {
+          for (let x = b.x; x < b.x + b.width; x++) {
+            // Check if this world coordinate falls within the current chunk
+            const localX = ((x % CHUNK_WIDTH) + CHUNK_WIDTH) % CHUNK_WIDTH;
+            const localY = ((y % CHUNK_HEIGHT) + CHUNK_HEIGHT) % CHUNK_HEIGHT;
+            const currentChunkX = Math.floor(x / CHUNK_WIDTH);
+            const currentChunkY = Math.floor(y / CHUNK_HEIGHT);
+
+            if (currentChunkX === chunkX && currentChunkY === chunkY) {
+              settlementTiles.add(`${localX},${localY}`);
+            }
+          }
+        }
+      }
+    }
 
     const cellular = new ROT.Map.Cellular(CHUNK_WIDTH, CHUNK_HEIGHT, {
       connected: true,
@@ -127,54 +153,15 @@ export class World {
     for (let i = 0; i < 4; i++) cellular.create();
 
     cellular.create((x, y, value) => {
-      const worldX = chunkX * CHUNK_WIDTH + x;
-      const worldY = chunkY * CHUNK_HEIGHT + y;
+      const localKey = `${x},${y}`;
 
-      let tile = TILE_TYPE.FLOOR;
-      let isSettlementTile = false;
-
-      // Check if this tile is part of a settlement building
-      if (settlement) {
-        for (const b of settlement.buildings) {
-          // Check if inside the building's outer rectangle
-          const isInsideOuterRect =
-            worldX >= b.x &&
-            worldX < b.x + b.width &&
-            worldY >= b.y &&
-            worldY < b.y + b.height;
-
-          // Check if it's a door
-          if (worldX === b.door.x && worldY === b.door.y) {
-            isSettlementTile = true;
-            tile = TILE_TYPE.DOOR; // Temporarily set to door, will be overwritten later
-            break;
-          }
-          // Check if it's a wall (outer rect but not inner rect)
-          const isInsideInnerRect =
-            worldX > b.x &&
-            worldX < b.x + b.width - 1 &&
-            worldY > b.y &&
-            worldY < b.y + b.height - 1;
-
-          if (isInsideOuterRect && !isInsideInnerRect) {
-            isSettlementTile = true;
-            tile = TILE_TYPE.SETTLEMENT_WALL; // Temporarily set to wall
-            break;
-          }
-          // Check if it's inside the building (floor)
-          if (isInsideOuterRect && isInsideInnerRect) {
-            isSettlementTile = true;
-            tile = TILE_TYPE.FLOOR;
-            break;
-          }
-        }
-      }
-
-      if (isSettlementTile) {
-        this.chunks[key][`${x},${y}`] = tile;
+      if (settlementTiles.has(localKey)) {
+        // This tile is part of a settlement building, ensure it's a floor initially
+        this.chunks[key][localKey] = TILE_TYPE.FLOOR;
       } else {
         // Original terrain generation logic for non-settlement areas
         const tileRoll = ROT.RNG.getUniform();
+        let tile = TILE_TYPE.FLOOR;
         if (value) {
           tile = TILE_TYPE.WALL;
         } else if (tileRoll < 0.02) {
@@ -192,21 +179,16 @@ export class World {
           else if (shrubType === 2) tile = TILE_TYPE.SHRUB_2;
           else tile = TILE_TYPE.SHRUB_3;
         }
-        this.chunks[key][`${x},${y}`] = tile;
+        this.chunks[key][localKey] = tile;
       }
     });
 
-    // const settlement = this._getSettlementForChunk(chunkX, chunkY); // This line is now commented out
+    // The existing settlement drawing logic will now correctly overwrite the pre-cleared areas
+    // and place walls/doors/placards.
     if (settlement) {
       if (!settlement.isPopulated) {
         this._populateSettlement(settlement);
       }
-      if (!settlement.areDetailsGenerated) {
-        settlement.generateDetails(this);
-        settlement.areDetailsGenerated = true;
-      }
-      // --- REVISED PLACARD AND SETTLEMENT LOGIC ---
-
       // 1. Determine placard location ONCE for the whole settlement
       if (settlement.placard.x === 0 && settlement.placard.y === 0) {
         const possiblePlacardLocations = [];
@@ -267,8 +249,7 @@ export class World {
             continue;
           }
 
-          const distance =
-            Math.abs(worldX - settlement.x) + Math.abs(worldY - settlement.y);
+          const distance = Math.hypot(worldX - settlement.x, worldY - settlement.y);
           if (distance <= SETTLEMENT_RADIUS) {
             let tileType = TILE_TYPE.FLOOR;
             for (const b of settlement.buildings) {
@@ -276,21 +257,18 @@ export class World {
                 tileType = TILE_TYPE.DOOR;
                 break;
               }
-              // This logic correctly draws a full, closed rectangle without gaps.
               const isInsideOuterRect =
                 worldX >= b.x &&
                 worldX < b.x + b.width &&
                 worldY >= b.y &&
                 worldY < b.y + b.height;
 
-              // This defines the "hollow" area inside the walls
               const isInsideInnerRect =
                 worldX > b.x &&
                 worldX < b.x + b.width - 1 &&
                 worldY > b.y &&
                 worldY < b.y + b.height - 1;
 
-              // A tile is a wall if it's in the outer box but not the inner box.
               if (isInsideOuterRect && !isInsideInnerRect) {
                 tileType = TILE_TYPE.SETTLEMENT_WALL;
                 break;
