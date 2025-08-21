@@ -159,6 +159,9 @@ export class Player {
       case "x":
         this.game.toggleInfoMode();
         break;
+      case "w":
+        tookTurn = this._wieldWeapon();
+        break;
     }
 
     if (tookTurn) {
@@ -522,6 +525,35 @@ export class Player {
         "You see nothing but endless desert in all directions.",
       );
     }
+    return true;
+  }
+
+  _wieldWeapon() {
+    const equippedWeapon = this.getEquippedWeapon();
+    const availableWeapons = this.inventory.filter(
+      (i) => i.type === "weapon",
+    );
+
+    if (availableWeapons.length === 0) {
+      this.game.renderer.displayMessage("You have no weapons to wield.");
+      return false;
+    }
+
+    let nextWeaponIndex = -1;
+    if (equippedWeapon) {
+      const currentIndex = availableWeapons.findIndex(
+        (w) => w === equippedWeapon,
+      );
+      nextWeaponIndex = (currentIndex + 1) % availableWeapons.length;
+      equippedWeapon.equipped = false; // Unequip current weapon
+    } else {
+      nextWeaponIndex = 0; // Equip the first weapon if nothing is equipped
+    }
+
+    const newWeapon = availableWeapons[nextWeaponIndex];
+    newWeapon.equipped = true;
+    this.game.renderer.displayMessage(`You wield the ${newWeapon.name}.`);
+    this.game.renderer.drawAll();
     return true;
   }
 }

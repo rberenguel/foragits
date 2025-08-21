@@ -56,6 +56,7 @@ export function setupMobileControls(game) {
       { key: "u", label: "U" },
       { key: "l", label: "L" },
       { key: "x", label: "X" },
+      { key: "Escape", label: "Esc" },
     ];
 
     const actionsGroup = document.createElement("div");

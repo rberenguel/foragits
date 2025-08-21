@@ -1,6 +1,7 @@
 // src/actors/bandit.js
 import { terrainInfo, TILE_TYPE } from "../terrain.js";
 import { createItem } from "../items.js";
+import { DISPLAY_WIDTH } from "../constants.js";
 // --- (Name generation code is unchanged) ---
 const firstNames = [
   "Jed",
@@ -176,6 +177,9 @@ export class Bandit {
     if (this.combatStance === "challenging" || this.combatStance === "aiming") {
       if (weapon && weapon.loaded > 0) {
         weapon.loaded--;
+        window.sampler("revolver-shot-1", 0.5, {
+          pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
+        });
         this.game.resolveShot(this, this._getAngleToPlayer());
         this.combatStance = this._isAdjacentToCover() ? "ducking" : "standing";
       } else {

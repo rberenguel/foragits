@@ -470,6 +470,7 @@ class Game {
         "blood",
         15,
       );
+      // TODO: add sound
     }
     target.takeDamage(damage);
   }
@@ -511,6 +512,7 @@ class Game {
       "corpse",
       15,
     );
+    // TODO: add sound
   }
 
   gameOver() {
