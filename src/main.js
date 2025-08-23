@@ -2,6 +2,7 @@ import { Player } from "./actors/player.js";
 import { Bandit } from "./actors/bandit.js";
 import { NPC } from "./actors/npc.js";
 import { Shopkeeper } from "./actors/shopkeeper.js";
+import { Sheriff } from "./actors/sheriff.js";
 import { World } from "./world.js";
 import { Renderer } from "./renderer.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from "./constants.js";
@@ -9,6 +10,7 @@ import { terrainInfo } from "./terrain.js";
 import { rollDice } from "./utils.js";
 import { TILE_TYPE } from "./terrain.js";
 import { setupMobileControls } from "./mobile_controls.js";
+import { createItem } from "./items.js";
 
 
 class Game {
@@ -28,6 +30,10 @@ class Game {
     this.shopSelectionIndex = 0; // New: Index of selected item in shop inventory
     this.playerSelectionIndex = 0; // New: Index of selected item in player inventory
     this.shopActiveInventory = "shop"; // New: "shop" or "player"
+    this.reputation = {
+      lawful: 0,
+      sheriff: 0,
+    };
     window.game = this
   }
 
@@ -219,6 +225,11 @@ class Game {
     this.activeShopkeeper = null;
     this.gameState = "playing";
     this.renderer.drawAll();
+  }
+
+  changeReputation(type, amount) {
+    this.reputation[type] += amount;
+    console.log(`Reputation (${type}): ${this.reputation[type]} (Changed by: ${amount})`);
   }
 
   buyItem(itemIndex) {
@@ -570,6 +581,20 @@ class Game {
   killEnemy(enemy) {
     this.scheduler.remove(enemy);
     this.renderer.displayMessage(`You killed ${enemy.name}.`);
+
+    if (enemy instanceof Bandit) {
+      this.changeReputation("lawful", 5); // Killing a bandit increases lawful reputation
+    } else if (enemy instanceof Shopkeeper) {
+      this.changeReputation("lawful", -50); // Killing a shopkeeper severely decreases lawful reputation
+      this.changeReputation("sheriff", -50); // Also decreases sheriff reputation
+    } else if (enemy instanceof Sheriff) {
+      this.changeReputation("lawful", -100); // Killing a sheriff severely decreases lawful reputation
+      this.changeReputation("sheriff", -100); // Also severely decreases sheriff reputation
+    } else if (enemy instanceof NPC) {
+      this.changeReputation("lawful", -20); // Killing a civilian NPC decreases lawful reputation
+      this.changeReputation("sheriff", -20); // Also decreases sheriff reputation
+    }
+
     enemy.char = "†";
     enemy.color = "#8B0000";
     // ... (rest of the logic is fine)
@@ -632,4 +657,13 @@ window.teleportPlayer = (x, y) => {
   game.player.y = y;
   game.renderer.drawAll();
   game.renderer.displayMessage(`Teleported to ${x},${y}`);
+};
+
+// Global function to add items for debugging/testing
+window.stuff = () => {
+  game.player.inventory.push(createItem("shotgun"));
+  game.player.inventory.push(createItem("revolver"));
+  game.player.inventory.push(createItem("can_of_beans", { quantity: 10 }));
+  game.renderer.displayMessage("Added shotgun, revolver, and 10 cans of beans.");
+  game.renderer.drawAll();
 };

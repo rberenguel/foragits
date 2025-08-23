@@ -217,7 +217,11 @@ export class Renderer {
       y++;
     });
     y += 2;
-    this.display.drawText(2, y, `Money: $${this.game.player.money}`);
+    this.display.drawText(2, y, `Money: ${this.game.player.money}`);
+    y++;
+    this.display.drawText(2, y, `Lawful Reputation: ${this.game.reputation.lawful}`);
+    y++;
+    this.display.drawText(2, y, `Sheriff Reputation: ${this.game.reputation.sheriff}`);
     const closeText = "([i] or [esc] to close)";
     this.display.drawText(
       DISPLAY_WIDTH - closeText.length - 1,
