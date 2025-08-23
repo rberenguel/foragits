@@ -108,10 +108,19 @@ export class NPC {
     this.fleeing = true;
     const currentBuilding = this.game.world.getBuildingAt(this.x, this.y);
     
+    const shotBuilding = this.game.world.getBuildingAt(shotX, shotY);
+
     if (currentBuilding) {
-      // Flee to the door if inside
-      this.fleeTarget = { x: currentBuilding.door.x, y: currentBuilding.door.y };
-      console.log(`${this.name} is inside, fleeing to door at (${this.fleeTarget.x}, ${this.fleeTarget.y})`);
+      // If inside, only flee if the shot is also inside the same building
+      if (shotBuilding && shotBuilding === currentBuilding) {
+        this.fleeTarget = { x: currentBuilding.door.x, y: currentBuilding.door.y };
+        console.log(`${this.name} is inside, fleeing to door at (${this.fleeTarget.x}, ${this.fleeTarget.y})`);
+      } else {
+        // If inside and shot is outside or in a different building, do not flee
+        this.fleeing = false;
+        this.fleeTarget = null;
+        return;
+      }
     } else {
       // Flee to the nearest building if outside
       const settlement = this.game.world.findNearestSettlement(this.x, this.y);
@@ -149,22 +158,44 @@ export class NPC {
       if (this.x === this.fleeTarget.x && this.y === this.fleeTarget.y) {
         this.fleeing = false;
         this.fleeTarget = null;
-        // If we reached the door from inside, step outside
-        const currentBuilding = this.game.world.getBuildingAt(this.x, this.y);
-        if(currentBuilding){
-            // find a valid tile outside the door
-            const moves = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-            for (const move of moves) {
-                const newX = this.x + move[0];
-                const newY = this.y + move[1];
-                if (this.game.world.isPassable(newX, newY) && !this.game.isTileOccupied(newX, newY, this) && !this.game.world.getBuildingAt(newX, newY)) {
+
+        const buildingAtFleeTarget = this.game.world.getBuildingAt(this.x, this.y);
+
+        if (buildingAtFleeTarget) {
+          // If we reached the door from inside, step outside
+          const moves = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+          for (const move of moves) {
+            const newX = this.x + move[0];
+            const newY = this.y + move[1];
+            if (this.game.world.isPassable(newX, newY) && !this.game.isTileOccupied(newX, newY, this) && !this.game.world.getBuildingAt(newX, newY)) {
+              this.x = newX;
+              this.y = newY;
+              break;
+            }
+          }
+        } else {
+          // If we reached a door from outside, step inside
+          const settlement = this.game.world.findNearestSettlement(this.x, this.y);
+          if (settlement) {
+            for (const building of settlement.buildings) {
+              if (building.door.x === this.x && building.door.y === this.y) {
+                // Found the building this door belongs to
+                const moves = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+                for (const move of moves) {
+                  const newX = this.x + move[0];
+                  const newY = this.y + move[1];
+                  // Check if the new tile is inside the building and passable
+                  if (this.game.world.getBuildingAt(newX, newY) === building && this.game.world.isPassable(newX, newY) && !this.game.isTileOccupied(newX, newY, this)) {
                     this.x = newX;
                     this.y = newY;
                     break;
+                  }
                 }
+                break;
+              }
             }
+          }
         }
-
         return;
       }
 
