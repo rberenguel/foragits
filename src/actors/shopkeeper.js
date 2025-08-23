@@ -50,6 +50,10 @@ export class Shopkeeper {
     ];
   }
 
+  isUnarmed() {
+    return false;
+  }
+
   getEquippedWeapon() {
     return this.inventory.find((i) => i.type === "weapon" && i.equipped);
   }

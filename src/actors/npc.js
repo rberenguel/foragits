@@ -87,6 +87,8 @@ export class NPC {
     this.color = "#3498db";
     this.name = generateNpcName();
     this.homeSettlement = homeSettlement;
+    this.fleeing = false;
+    this.fleeTarget = null;
     this.inventory = [
       createItem("money", {
         quantity: Math.floor(Math.random() * 10) + 5, // 5 to 14 dollars
@@ -96,6 +98,37 @@ export class NPC {
     this.dialogues =
       dialogueSets[Math.floor(Math.random() * dialogueSets.length)];
     this.dialogueIndex = 0;
+  }
+
+  isUnarmed() {
+    return !this.inventory.some(item => item.kind === 'revolver' || item.kind === 'shotgun');
+  }
+
+  fleeFromGunshot(shotX, shotY) {
+    this.fleeing = true;
+    const currentBuilding = this.game.world.getBuildingAt(this.x, this.y);
+    
+    if (currentBuilding) {
+      // Flee to the door if inside
+      this.fleeTarget = { x: currentBuilding.door.x, y: currentBuilding.door.y };
+      console.log(`${this.name} is inside, fleeing to door at (${this.fleeTarget.x}, ${this.fleeTarget.y})`);
+    } else {
+      // Flee to the nearest building if outside
+      const settlement = this.game.world.findNearestSettlement(this.x, this.y);
+      if (settlement && settlement.buildings.length > 0) {
+        let nearestDoor = null;
+        let minDistance = Infinity;
+        for (const building of settlement.buildings) {
+          const distance = Math.hypot(this.x - building.door.x, this.y - building.door.y);
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestDoor = building.door;
+          }
+        }
+        this.fleeTarget = nearestDoor;
+        console.log(`${this.name} is outside, fleeing to nearest door at (${this.fleeTarget.x}, ${this.fleeTarget.y})`);
+      }
+    }
   }
 
   takeDamage(amount) {
@@ -112,6 +145,55 @@ export class NPC {
   }
 
   act() {
+    if (this.fleeing && this.fleeTarget) {
+      if (this.x === this.fleeTarget.x && this.y === this.fleeTarget.y) {
+        this.fleeing = false;
+        this.fleeTarget = null;
+        // If we reached the door from inside, step outside
+        const currentBuilding = this.game.world.getBuildingAt(this.x, this.y);
+        if(currentBuilding){
+            // find a valid tile outside the door
+            const moves = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+            for (const move of moves) {
+                const newX = this.x + move[0];
+                const newY = this.y + move[1];
+                if (this.game.world.isPassable(newX, newY) && !this.game.isTileOccupied(newX, newY, this) && !this.game.world.getBuildingAt(newX, newY)) {
+                    this.x = newX;
+                    this.y = newY;
+                    break;
+                }
+            }
+        }
+
+        return;
+      }
+
+      const astar = new ROT.Path.AStar(
+        this.fleeTarget.x,
+        this.fleeTarget.y,
+        (x, y) => {
+          const tile = this.game.world.getTileAt(x, y);
+          return terrainInfo[tile]?.isPassable && !this.game.isTileOccupied(x, y, this);
+        },
+        { topology: 8 },
+      );
+
+      const path = [];
+      astar.compute(this.x, this.y, (x, y) => {
+        path.push({ x, y });
+      });
+
+      if (path.length > 1) {
+        this.x = path[1].x;
+        this.y = path[1].y;
+      } else {
+        // Cannot reach target, stop fleeing
+        this.fleeing = false;
+        this.fleeTarget = null;
+      }
+      return;
+    }
+
     // NPCs only move about 30% of the time
     if (Math.random() > 0.3) {
       return;

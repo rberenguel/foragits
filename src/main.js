@@ -498,6 +498,7 @@ class Game {
         } else {
           this.attack(attacker, targetActor, aimVector);
         }
+        this.notifyNPCsOfGunshot(attacker.x, attacker.y);
         return;
       }
 
@@ -530,7 +531,20 @@ class Game {
           });
           this.renderer.createRicochetEffect(point.x, point.y, aimVector, visualDelayMs);
         }
+        this.notifyNPCsOfGunshot(attacker.x, attacker.y);
         return;
+      }
+    }
+    this.notifyNPCsOfGunshot(attacker.x, attacker.y);
+  }
+  notifyNPCsOfGunshot(shotX, shotY) {
+    for (const npc of this.npcs) {
+      if (npc.isUnarmed()) {
+        const distance = Math.hypot(npc.x - shotX, npc.y - shotY);
+        if (distance < 50) {
+          console.log(`Notifying ${npc.name} at (${npc.x}, ${npc.y}) to flee from shot at (${shotX}, ${shotY}), distance: ${distance}`);
+          npc.fleeFromGunshot(shotX, shotY);
+        }
       }
     }
   }
