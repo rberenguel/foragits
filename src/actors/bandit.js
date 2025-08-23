@@ -138,6 +138,7 @@ export class Bandit {
       return terrainInfo[tileChar]?.isTransparent ?? false;
     };
     this.fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
+    this.coverTarget = null; // New property to store cover target
   }
 
   getEquippedWeapon() {
@@ -186,7 +187,7 @@ export class Bandit {
           pan: window.calculatePanFromPosition(this, this.game.player, DISPLAY_WIDTH),
         });
         this.game.resolveShot(this, this._getAngleToPlayer());
-        this.combatStance = this._isAdjacentToCover() ? "ducking" : "standing";
+        this.combatStance = this._isNextToCover(this.x, this.y) ? "ducking" : "standing";
       } else {
         // Was aiming but ran out of ammo, must reload or flee.
         if (this._reloadWeapon()) {
@@ -195,6 +196,14 @@ export class Bandit {
         this.combatStance = "standing";
       }
       return; // Turn is over.
+    } else if (this.combatStance === "moving_to_cover") {
+      if (this.coverTarget && this.x === this.coverTarget.x && this.y === this.coverTarget.y) {
+        this.combatStance = "ducking";
+        this.coverTarget = null;
+      } else if (this.coverTarget) {
+        this._moveTowards(this.coverTarget);
+      }
+      return;
     }
 
     // --- 3. Decide Next Action ---
@@ -213,9 +222,28 @@ export class Bandit {
       }
 
       if (playerIsVisible) {
-        this.combatStance = this._isAdjacentToCover()
-          ? "challenging"
-          : "aiming";
+        console.log(`${this.name}: Player is visible.`);
+        const currentlyInCover = this._isNextToCover(this.x, this.y);
+        console.log(`${this.name}: Currently in cover: ${currentlyInCover}`);
+
+        if (!currentlyInCover) {
+          const coverPosition = this._findCoverPosition();
+          console.log(`${this.name}: Found cover position:`, coverPosition);
+
+          if (coverPosition) {
+            this.coverTarget = coverPosition;
+            this.combatStance = "moving_to_cover";
+            this._moveTowards(this.coverTarget);
+            console.log(`${this.name}: Moving to cover at (${this.coverTarget.x}, ${this.coverTarget.y})`);
+            return;
+          } else {
+            this.combatStance = "aiming";
+            console.log(`${this.name}: No cover found, aiming.`);
+          }
+        } else {
+          this.combatStance = "challenging";
+          console.log(`${this.name}: In cover, challenging.`);
+        }
       } else {
         this.combatStance = "standing";
         this._moveTowards(this.lastKnownPlayerPosition);
@@ -272,18 +300,12 @@ if(weapon.kind === "revolver"){
     return Math.atan2(dy, dx) * (180 / Math.PI);
   }
 
-  _isAdjacentToCover() {
+  _isNextToCover(x, y) {
     const coverTypes = [
       TILE_TYPE.ROCK,
-      TILE_TYPE.WALL,
-      // TODO: Should be for all actors
-      TILE_TYPE.CACTUS,
-      TILE_TYPE.CACTUS_2,
-      TILE_TYPE.CACTUS_3,
       TILE_TYPE.WATER_TROUGH,
       TILE_TYPE.CRATE,
       TILE_TYPE.BARREL,
-      TILE_TYPE.SETTLEMENT_WALL,
     ];
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
@@ -295,13 +317,73 @@ if(weapon.kind === "revolver"){
     return false;
   }
 
+  _findCoverPosition() {
+    const searchRadius = 20; // How far the bandit looks for cover
+    let bestCoverPosition = null;
+    let maxCoverScore = -1;
+
+    for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+      for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+        const potentialCoverX = this.x + dx;
+        const potentialCoverY = this.y + dy;
+
+        // Don't consider current position or occupied tiles
+        if (
+          (potentialCoverX === this.x && potentialCoverY === this.y) ||
+          this.game.isTileOccupied(potentialCoverX, potentialCoverY, this)
+        ) {
+          continue;
+        }
+
+        const tile = this.game.world.getTileAt(potentialCoverX, potentialCoverY);
+        if (!terrainInfo[tile]?.isPassable) {
+          continue; // Must be a passable tile to move to
+        }
+
+        // Check if this potential position is next to a cover-providing tile
+        if (this._isNextToCover(potentialCoverX, potentialCoverY)) {
+          let coverScore = 0;
+          // Prioritize cover that blocks bullets or line of sight
+          for (let cdx = -1; cdx <= 1; cdx++) {
+            for (let cdy = -1; cdy <= 1; cdy++) {
+              if (cdx === 0 && cdy === 0) continue;
+              const coverTileX = potentialCoverX + cdx;
+              const coverTileY = potentialCoverY + cdy;
+              const coverTileType = this.game.world.getTileAt(coverTileX, coverTileY);
+              const coverTileInfo = terrainInfo[coverTileType];
+
+              if (coverTileInfo && coverTileInfo.isBulletPassable === false) {
+                coverScore += 2; // Strong cover
+              } else if (coverTileInfo && coverTileInfo.isTransparent === false) {
+                coverScore += 1; // Blocks LOS, but not necessarily bullets (e.g., a door)
+              }
+            }
+          }
+
+          // Add a small bonus for being further from the player, encouraging retreat to cover
+          const distanceToPlayer = Math.hypot(
+            potentialCoverX - this.game.player.x,
+            potentialCoverY - this.game.player.y,
+          );
+          coverScore += Math.max(0, distanceToPlayer - 3); // Bonus for distance beyond 3 tiles
+
+          if (coverScore > maxCoverScore) {
+            maxCoverScore = coverScore;
+            bestCoverPosition = { x: potentialCoverX, y: potentialCoverY };
+          }
+        }
+      }
+    }
+    return bestCoverPosition;
+  }
+
   _moveTowards(target) {
     const distanceToTarget = Math.hypot(this.x - target.x, this.y - target.y);
     // --- THIS IS THE KEY CHANGE ---
     // Stop moving if we are already at a good distance (5 tiles or closer).
     if (distanceToTarget <= 5) {
       // If we're not in cover, we'll just hold our ground for a turn before re-evaluating.
-      if (!this._isAdjacentToCover()) {
+      if (!this._isNextToCover(this.x, this.y)) {
         this.combatStance = "standing";
       }
       return;
